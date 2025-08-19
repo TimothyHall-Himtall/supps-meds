@@ -28,8 +28,7 @@
   button.warn{background:linear-gradient(180deg,#f59e0b,#d97706)}
   button.danger{background:linear-gradient(180deg,#ef4444,#dc2626)}
   button.ok{background:linear-gradient(180deg,#22c55e,#16a34a)}
-  .muted{color:var(--muted)}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
+  .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
   .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #254065;background:#0c1424}
   .list{display:flex;flex-direction:column;gap:10px}
   .item{display:flex;gap:10px;justify-content:space-between;align-items:center;border:1px solid #1f2a44;background:#0b1420;padding:10px;border-radius:10px}
@@ -103,7 +102,7 @@
             </div>
             <div class="col" style="flex:1;min-width:200px">
               <label>Class (optional, meds)</label>
-              <input id="classInput" placeholder="e.g., SSRI, statin, PPI, thyroid…" />
+              <input id="classInput" placeholder="e.g., SSRI, statin, PPI, thyroid, ace inhibitor…" />
             </div>
           </div>
 
@@ -185,6 +184,19 @@ const log = (...a)=>{ const el=$("#diag"); if(!el) return; const line=document.c
 function uuid(){ try{ return crypto.randomUUID(); }catch{ return "id-"+Math.random().toString(36).slice(2); } }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* Normalizers to catch punctuation/spacing variants (e.g., "st. john's wort") */
+function normSpaces(s){
+  return String(s||"")
+    .toLowerCase()
+    .replace(/&/g," and ")
+    .replace(/[._'’\-/,()]/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+function normFlat(s){
+  return normSpaces(s).replace(/\s+/g,""); // remove spaces entirely for substring checks
+}
 
 /* ---------------- Elements ---------------- */
 const engineNameEl = $("#engineName");
@@ -540,7 +552,10 @@ function parseTextPlan(txt){
 /* ---------------- Knowledge base ---------------- */
 const KNOW = (function(){
 
+  // Expanded synonyms (multi-word + class labels)
   const synonyms = new Map(Object.entries({
+    "st johns wort": ["st. john's wort","st john's wort","st johns-wort","hypericum","hypericum perforatum","saint johns wort","saint john's wort"],
+
     "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
     "vitamin d": ["vit d","cholecalciferol","d3","ergocalciferol","d2"],
     "vitamin a": ["retinol","retinyl","beta-carotene","beta carotene"],
@@ -552,86 +567,119 @@ const KNOW = (function(){
     "fish oil": ["omega 3","epa","dha","omega-3","fish oil concentrate","cod liver oil","omega 3 fish oil"],
     "curcumin": ["turmeric","curcuminoids"],
     "berberine": ["berberis","goldenseal"],
-    "st johns wort": ["st. john's wort","hypericum"],
-    "5-htp": ["5htp","5 hydroxytryptophan","l-5-htp"],
-    "sam-e": ["same","s-adenosylmethionine","s adenosyl methionine"],
     "melatonin": [],
     "coq10": ["ubiquinone","ubiquinol","co-enzyme q10","coenzyme q10"],
     "probiotic": ["lactobacillus","bifidobacterium","saccharomyces boulardii","probiotics"],
     "grapefruit": ["grapefruit extract","grapefruit juice"],
 
-    "warfarin": ["coumadin","jantoven"],
-    "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine"],
+    "cyclophosphamide": ["cytoxan","endoxan","procytox"],
+
+    // Med classes (expanded)
+    "ace/arb": [
+      "lisinopril","enalapril","ramipril","benazepril","losartan","valsartan","olmesartan","candesartan",
+      "ace inhibitor","ace-inhibitor","acei","angiotensin converting enzyme inhibitor","angiotensin-converting enzyme inhibitor",
+      "arb","angiotensin receptor blocker"
+    ],
+    "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine","selective serotonin reuptake inhibitor"],
     "snri": ["venlafaxine","desvenlafaxine","duloxetine","levomilnacipran","milnacipran"],
-    "maoi": ["phenelzine","tranylcypromine","isocarboxazid","selegiline"],
+    "maoi": ["phenelzine","tranylcypromine","isocarboxazid","selegiline","monoamine oxidase inhibitor"],
     "thyroid": ["levothyroxine","lt4","liothyronine","desiccated thyroid","np thyroid","armour thyroid"],
-    "quinolone": ["ciprofloxacin","levofloxacin","moxifloxacin","ofloxacin"],
+    "quinolone": ["ciprofloxacin","levofloxacin","moxifloxacin","ofloxacin","fluoroquinolone"],
     "tetracycline": ["doxycycline","minocycline","tetracycline"],
     "bisphosphonate": ["alendronate","risedronate","ibandronate","zoledronic acid"],
-    "ppi": ["omeprazole","esomeprazole","lansoprazole","pantoprazole","rabeprazole"],
+    "ppi": ["omeprazole","esomeprazole","lansoprazole","pantoprazole","rabeprazole","proton pump inhibitor"],
     "statin": ["atorvastatin","simvastatin","lovastatin","rosuvastatin","pravastatin","pitavastatin"],
-    "ace/arb": ["lisinopril","enalapril","ramipril","benazepril","losartan","valsartan","olmesartan","candesartan"],
-    "diuretic": ["furosemide","torsemide","bumetanide","hydrochlorothiazide","chlorthalidone"],
     "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"]
   }));
 
-  function canonize(s){
-    s = String(s||"").toLowerCase().trim();
+  function canonize(raw){
+    let s = normSpaces(raw); // lowercased, punctuation-normalized
+    // direct canonical match
+    if (synonyms.has(s)) return s;
+    // check if s equals any synonym; if so, return its canonical key
     const it = synonyms.entries();
     for (let kv = it.next(); !kv.done; kv = it.next()){
       const canon = kv.value[0], alts = kv.value[1];
       if (s===canon) return canon;
-      for (let j=0;j<alts.length;j++){ if (alts[j]===s) return canon; }
+      for (let j=0;j<alts.length;j++){ if (s===normSpaces(alts[j])) return canon; }
     }
     return s;
   }
 
   const checks = [
+    // Specific: St John's Wort + Cyclophosphamide
+    function({has}){ if (has("st johns wort") && has("cyclophosphamide")) return {
+      severity:"moderate",
+      title:"St John’s Wort + Cyclophosphamide",
+      message:"St John’s Wort induces drug-metabolizing enzymes/transporters and may alter cyclophosphamide exposure/effectiveness.",
+      action:"Avoid combining unless your oncology team approves; review all supplements with them."
+    }; },
+
+    // General enzyme induction by SJW
+    function({has}){ if (has("st johns wort")) return {
+      severity:"moderate",
+      title:"St John’s Wort – Enzyme/Transporter Induction",
+      message:"Can change levels of many medicines (e.g., oral contraceptives, some anticoagulants/antidepressants/chemotherapy) via CYP3A4/P-gp induction.",
+      action:"Review all meds with a pharmacist/clinician before using St John’s Wort."
+    }; },
+
+    // Warfarin + Vitamin K
     function({has}){ if (has("warfarin") && has("vitamin k")) return {
       severity:"moderate", title:"Warfarin + Vitamin K",
       message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
       action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."
     }; },
+
+    // Warfarin + bleeding-risk supplements
     function({hasAny}){ if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) return {
       severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
       message:"May increase bleeding tendency.",
       action:"Monitor for bleeding/bruising; discuss with clinician."
     }; },
+
+    // Serotonergic combos
     function({hasAny}){ if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])) return {
       severity:"high", title:"Serotonergic Combination",
-      message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise risk of serotonin syndrome.",
+      message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise serotonin-syndrome risk.",
       action:"Avoid combining or use only under medical supervision."
     }; },
-    function({has}){ if (has("st johns wort")) return {
-      severity:"moderate", title:"St John’s Wort – Enzyme Induction",
-      message:"Can reduce levels of many medications via CYP3A4 induction.",
-      action:"Review all meds with a pharmacist if using St John’s Wort."
-    }; },
-    function({hasAny,has}){ if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) return {
+
+    // Thyroid + minerals
+    function({has,hasAny}){ if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) return {
       severity:"moderate", title:"Thyroid + Minerals",
       message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
       action:"Separate by at least 4 hours."
     }; },
+
+    // Antibiotics + minerals
     function({hasAny}){ if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) return {
       severity:"moderate", title:"Antibiotic + Minerals",
       message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
       action:"Separate by 2–4 hours (follow label)."
     }; },
+
+    // Statins + grapefruit
     function({has}){ if (has("statin") && has("grapefruit")) return {
       severity:"moderate", title:"Statin + Grapefruit",
       message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
       action:"Avoid grapefruit unless your statin is known to be unaffected."
     }; },
+
+    // ACE/ARB + potassium (now recognizes “ace inhibitor” class text)
     function({hasAny}){ if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) return {
       severity:"moderate", title:"ACE/ARB + Potassium",
       message:"May increase potassium levels.",
       action:"Avoid extra potassium unless prescribed; monitor if directed."
     }; },
+
+    // Anticoagulants + fish oil/curcumin
     function({hasAny}){ if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) return {
       severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
       message:"Potential additive bleeding risk.",
       action:"Use cautiously; discuss with clinician."
     }; },
+
+    // Berberine + glucose-lowering meds
     function({hasAny}){ if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) return {
       severity:"low", title:"Berberine + Glucose-Lowering Meds",
       message:"May enhance glucose-lowering effects.",
@@ -665,40 +713,56 @@ const KNOW = (function(){
   }
 
   return { canonize, checks, perProductAdvice };
-
-  function canonize(s){
-    s = String(s||"").toLowerCase().trim();
-    const it = synonyms.entries();
-    for (let kv = it.next(); !kv.done; kv = it.next()){
-      const canon = kv.value[0], alts = kv.value[1];
-      if (s===canon) return canon;
-      for (let j=0;j<alts.length;j++){ if (alts[j]===s) return canon; }
-    }
-    return s;
-  }
 })();
 
+/* --------- Analyzer (improved multi-word & class detection) --------- */
 function analyze(items){
-  const bag = new Set();
-  for (let i=0;i<items.length;i++){
-    const p = items[i];
-    const fields = [].concat(p.ingredients||[], p.classHint? [p.classHint]:[], p.name||"");
-    for (let k=0;k<fields.length;k++){
-      const raw = fields[k];
-      const parts = String(raw).split(/[+,/()\-]| and | with | & |;|:|\s+/i).map(function(s){return s.trim();}).filter(function(x){return !!x;});
-      for (let j=0;j<parts.length;j++){ bag.add(KNOW.canonize(parts[j])); }
+  const bag = new Set();       // canonical tokens/phrases (space-normalized)
+  const bagFlat = new Set();   // flattened (no spaces) for substring matches
+
+  function addToBag(s){
+    if (!s) return;
+    const canon = KNOW.canonize(s);
+    bag.add(canon);
+    bagFlat.add(normFlat(s));
+    bagFlat.add(normFlat(canon));
+    // also split into parts for single-word hits
+    const parts = normSpaces(s).split(/\s+/).filter(Boolean);
+    for (let i=0;i<parts.length;i++){
+      const p = parts[i];
+      bag.add(KNOW.canonize(p));
+      bagFlat.add(normFlat(p));
     }
   }
-  function has(canon){
-    if (bag.has(canon)) return true;
-    const it = bag.values();
-    for (let v = it.next(); !v.done; v = it.next()){ if (String(v.value).indexOf(canon)>-1) return true; }
+
+  for (let i=0;i<items.length;i++){
+    const p = items[i];
+    addToBag(p.name||"");
+    addToBag(p.classHint||"");
+    const ings = p.ingredients||[];
+    for (let j=0;j<ings.length;j++){ addToBag(ings[j]); }
+  }
+
+  function has(q){
+    const qc = KNOW.canonize(q);
+    if (bag.has(qc)) return true;
+
+    // substring match on flattened forms (handles punctuation/space variants)
+    const qf = normFlat(qc);
+    const it = bagFlat.values();
+    for (let v = it.next(); !v.done; v = it.next()){
+      if (v.value.indexOf(qf) > -1) return true;
+    }
     return false;
   }
   function hasAny(arr){ for (let i=0;i<arr.length;i++){ if (has(arr[i])) return true; } return false; }
 
   const foundInteractions = [];
-  for (let i=0;i<KNOW.checks.length;i++){ const r = KNOW.checks[i]({has:has,hasAny:hasAny}); if (r) foundInteractions.push(r); }
+  const checks = KNOW.checks;
+  for (let i=0;i<checks.length;i++){
+    const r = checks[i]({has:has, hasAny:hasAny});
+    if (r) foundInteractions.push(r);
+  }
   const uniq = function(arr, key){ return Array.from(new Map(arr.map(function(o){ return [o[key], o]; })).values()); };
   const perProd = KNOW.perProductAdvice(has);
 
@@ -729,88 +793,4 @@ function renderAnalysis(){
   if (!perProd.length){
     timingUIEl.innerHTML = `<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>`;
   } else {
-    const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="18px";
-    for (let i=0;i<perProd.length;i++){
-      const r = perProd[i];
-      const li = document.createElement("li");
-      li.innerHTML = `<strong>${esc(capitalize(r.key))}</strong> — <em>${esc(r.dosage)}</em>; ${esc(r.times)}; ${esc(r.timing)} ${r.withFood?`• With food: ${esc(r.withFood)}`:""}`;
-      ul2.appendChild(li);
-    }
-    timingUIEl.appendChild(ul2);
-  }
-
-  updateTextPreview();
-}
-
-/* ---------------- Event Listeners ---------------- */
-document.getElementById("startBtn").addEventListener("click", startCamera);
-document.getElementById("stopBtn").addEventListener("click", stopCamera);
-document.getElementById("forceZXingBtn").addEventListener("click", function(){
-  forceZXing=true;
-  if (scanning) startCamera();
-});
-
-document.getElementById("addBtn").addEventListener("click", addOrUpdate);
-document.getElementById("clearFormBtn").addEventListener("click", clearForm);
-
-document.getElementById("analyzeBtn").addEventListener("click", renderAnalysis);
-
-document.getElementById("copyTextBtn").addEventListener("click", async function(){
-  await navigator.clipboard.writeText(buildTextPlan(products));
-  alert("Copied the plain-text plan to clipboard.");
-});
-document.getElementById("downloadTextBtn").addEventListener("click", function(){
-  const blob = new Blob([buildTextPlan(products)], {type:"text/plain"});
-  const url = URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download="supplement-med-plan.txt"; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
-});
-document.getElementById("importBtn").addEventListener("click", function(){
-  const txt = prompt("Paste a plain-text plan created by this app. (Existing entries will be merged.)");
-  if (!txt) return;
-  try{
-    const parsed = parseTextPlan(txt);
-    const key = function(p){ return (p.barcode && p.barcode.trim()) || p.name.toLowerCase(); };
-    const map = new Map(products.map(function(p){ return [key(p),p]; }));
-    for (let i=0;i<parsed.length;i++){
-      const p = parsed[i]; const k = key(p);
-      map.set(k, Object.assign({}, map.get(k)||{}, p));
-    }
-    products = Array.from(map.values());
-    save(); renderList(); updateTextPreview();
-    alert("Imported.");
-  }catch(e){ alert("Import failed: " + (e && e.message ? e.message : String(e))); }
-});
-document.getElementById("resetBtn").addEventListener("click", function(){
-  if (!confirm("Clear saved products?")) return;
-  products = []; save(); renderList(); updateTextPreview();
-});
-
-/* ---------------- Init ---------------- */
-(async function init(){
-  selfTest();
-  engineNameEl.textContent = ('BarcodeDetector' in window && !forceZXing) ? "BarcodeDetector" : "ZXing";
-  renderList(); updateTextPreview();
-  try{
-    await listCameras();
-    // If labels hidden until permission is granted, briefly request then release
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-      const needLabels = !Array.from(cameraSelect.options).some(function(o){return o.textContent && o.textContent!=="Camera 1";});
-      if (needLabels){
-        try{
-          const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-          temp.getTracks().forEach(function(t){t.stop();});
-          await listCameras();
-        }catch(e){}
-      }
-    }
-  }catch(e){ log("Init error:", e && e.message ? e.message : String(e)); }
-})();
-</script>
-
-<footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
-  <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
-  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.4 (ZXing export fix)</div>
-</footer>
-</body>
-</html>
+    const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="
