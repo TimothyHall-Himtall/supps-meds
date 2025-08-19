@@ -821,15 +821,3 @@ function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slic
 </footer>
 </body>
 </html>
-```
-
----
-
-### What changed (quick hits)
-
-* **ZXing reliability:** robust multi-CDN loader + “**Force ZXing**” button if native `BarcodeDetector` is flaky. You’ll see loader progress in **Diagnostics**.
-* **Plain-text plan:** buttons to **Copy Plan (Text)** and **Download TXT**; preview shows exactly what will be exported. You can **Import (Text)** later so you don’t have to rescan.
-* **Per-product guidance:** adds typical **dosage ranges** (supplements) and **timing** (supplements + meds). Medications show **timing only** (dosing must follow the prescription).
-* **Interaction matching:** slightly more permissive matching (name tokens + ingredients + class), so entering “magnesium glycinate” or “sertraline” should trigger the appropriate guidance.
-
-If you want me to preload your most-used products (so the app auto-fills per-product rules), tell me the exact names/ingredients and I’ll bake them into the lookup.
