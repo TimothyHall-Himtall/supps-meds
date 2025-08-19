@@ -177,10 +177,10 @@
     </section>
   </main>
 
-  <!-- ZXing UMD (no modules, no dynamic import) -->
+  <!-- ZXing UMD -->
   <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
 
-  <!-- App script (no modern syntax; runs everywhere that supports getUserMedia) -->
+  <!-- App script -->
   <script>
   // Surface runtime errors to Diagnostics
   window.addEventListener("error", function(e){
@@ -196,9 +196,17 @@
   function $(s){ return document.querySelector(s); }
   function log(){ var el=$("#diag"); if(!el) return; var line=document.createElement("div"); line.textContent=[].slice.call(arguments).join(" "); el.prepend(line); }
   function uuid(){ try{ return crypto.randomUUID(); }catch(_){ return "id-"+Math.random().toString(36).slice(2); } }
-  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({ "&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;" })[c]; }); }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return c==='&' ? '&amp;'
+           : c==='<' ? '&lt;'
+           : c==='>' ? '&gt;'
+           : c==='"' ? '&quot;'
+           : '&#39;';
+    });
+  }
   function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
-  function normalizePhrase(s){ return String(s||"").toLowerCase().replace(/['’]/g,"").replace(/[._/()\\-]+/g," ").replace(/\\s+/g," ").trim(); }
+  function normalizePhrase(s){ return String(s||"").toLowerCase().replace(/['’]/g,"").replace(/[._/()\-]+/g," ").replace(/\s+/g," ").trim(); }
 
   // Elements
   var engineNameEl = $("#engineName");
@@ -213,10 +221,10 @@
   // State
   var LS_KEY = "scannedProducts_v4_textplan_norm";
   var products = load();
-  var stream = null;           // native only
+  var stream = null;
   var scanning = false;
   var forceZXing = false;
-  var zxingReader = null;      // UMD ZXing reader
+  var zxingReader = null;
   var seenCodes = new Map();
 
   // Storage
@@ -225,6 +233,7 @@
 
   // Diagnostics
   function selfTest(){
+    log("App loaded.");
     var secure = (window.isSecureContext===true);
     log("Secure Context:", secure ? "yes" : "no (camera requires HTTPS)");
     log("mediaDevices:", navigator.mediaDevices ? "ok" : "missing");
@@ -253,8 +262,6 @@
   async function startCamera(){
     stopCamera();
     scanning = true;
-
-    // Choose engine first to avoid double-opening the camera
     var useNative = ("BarcodeDetector" in window) && !forceZXing;
 
     if (useNative){
@@ -269,13 +276,11 @@
   function stopCamera(){
     scanning=false;
 
-    // Stop ZXing reader if running
     if (zxingReader){
       try{ zxingReader.reset(); }catch(_){}
       zxingReader = null;
     }
 
-    // Stop native stream if running
     if (videoEl){
       try{ videoEl.pause(); videoEl.srcObject = null; }catch(_){}
     }
@@ -338,14 +343,14 @@
     tick();
   }
 
-  // ZXing UMD fallback (no dynamic import)
+  // ZXing UMD fallback
   async function startZXing(){
     try{
       if (!window.ZXing) throw new Error("ZXing UMD not loaded");
       var Reader = window.ZXing.BrowserMultiFormatReader;
       if (!Reader) throw new Error("BrowserMultiFormatReader not available");
 
-      zxingReader = new Reader(undefined, 60); // (hints, timeBetweenScansMillis)
+      zxingReader = new Reader(undefined, 60);
       var deviceId = cameraSelect.value || null;
       var constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } } };
 
@@ -353,7 +358,6 @@
         if (result){
           try{ handleCode(String(result.getText())); }catch(_){}
         }
-        // ignore transient errors
       });
 
       log("ZXing reader running.");
@@ -500,15 +504,15 @@
     }
     lines.push("");
     lines.push("Notes: Educational tool only. Confirm safety, dosing, and timing with your pharmacist/clinician.");
-    return lines.join("\\n");
+    return lines.join("\n");
   }
   function updateTextPreview(){ textPreviewEl.textContent = buildTextPlan(products); }
   function parseTextPlan(txt){
-    var lines = txt.split(/\\r?\\n/), out=[];
+    var lines = txt.split(/\r?\n/), out=[];
     for (var i=0;i<lines.length;i++){
       var ln = lines[i];
       if (ln.indexOf("- ")===0){
-        var m = ln.match(/^- (.+?)(?: \\[([0-9A-Za-z]+)\\])? \\| Type: ([^|]+)(?: \\| Class: ([^|]+))?(?: \\| Ingredients: (.*))?$/);
+        var m = ln.match(/^- (.+?)(?: \[([0-9A-Za-z]+)\])? \| Type: ([^|]+)(?: \| Class: ([^|]+))?(?: \| Ingredients: (.*))?$/);
         if (m){
           var name = m[1].trim();
           var barcode = (m[2]||"").trim();
@@ -522,7 +526,7 @@
     return out;
   }
 
-  // Knowledge (synonyms/rules/dosage)
+  // Knowledge base
   var KNOW = (function(){
     var synonyms = new Map(Object.entries({
       "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
@@ -698,7 +702,7 @@
         if (!norm) continue;
 
         bag.add(KNOW.canonize(norm));
-        var parts = norm.split(/\\s+/).filter(Boolean);
+        var parts = norm.split(/\s+/).filter(Boolean);
         for (var j=0;j<parts.length;j++){ if (parts[j].length>1) bag.add(KNOW.canonize(parts[j])); }
         for (var n=2;n<=3;n++){
           for (var a=0;a<=parts.length-n;a++){
@@ -743,7 +747,7 @@
       for (var i=0;i<interactions.length;i++){
         var item = interactions[i];
         var li = document.createElement("li");
-        li.innerHTML = '<span class="'+(item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':''))+'"><strong>'+item.title+'</strong></span> — '+item.message+' '+(item.action?('<em>Action:</em> '+item.action):"");
+        li.innerHTML = '<span class="'+(item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':''))+'"><strong>'+esc(item.title)+'</strong></span> — '+esc(item.message)+' '+(item.action?('<em>Action:</em> '+esc(item.action)):"");
         ul.appendChild(li);
       }
       interactionsEl.appendChild(ul);
@@ -757,7 +761,7 @@
       for (var j=0;j<perProd.length;j++){
         var r = perProd[j];
         var li2 = document.createElement("li");
-        li2.innerHTML = '<strong>'+capitalize(r.key)+'</strong> — <em>'+r.dosage+'</em>; '+r.times+'; '+r.timing+' '+(r.withFood?('• With food: '+r.withFood):"");
+        li2.innerHTML = '<strong>'+esc(capitalize(r.key))+'</strong> — <em>'+esc(r.dosage)+'</em>; '+esc(r.times)+'; '+esc(r.timing)+' '+(r.withFood?('• With food: '+esc(r.withFood)):"");
         ul2.appendChild(li2);
       }
       timingUIEl.appendChild(ul2);
@@ -831,7 +835,8 @@
 
   <footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
     <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
-    <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.8 (no modules/import; UMD ZXing; stable buttons; dosage & interactions)</div>
+    <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.9 hotfix (fixed esc() syntax; working buttons; dosage & interactions; ZXing fallback)</div>
   </footer>
 </body>
 </html>
+
