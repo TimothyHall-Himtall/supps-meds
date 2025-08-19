@@ -59,9 +59,9 @@
               <select id="cameraSelect" title="Select camera"></select>
             </div>
             <div class="row" style="align-self:end">
-              <button id="startBtn">Start Camera</button>
-              <button class="ghost" id="stopBtn">Stop</button>
-              <button class="ghost" id="forceZXingBtn" title="Force ZXing fallback">Force ZXing</button>
+              <button id="startBtn" type="button">Start Camera</button>
+              <button class="ghost" id="stopBtn" type="button">Stop</button>
+              <button class="ghost" id="forceZXingBtn" type="button" title="Force ZXing fallback">Force ZXing</button>
               <span class="pill"><span>Engine:&nbsp;</span><strong id="engineName" class="mono">…</strong></span>
             </div>
           </div>
@@ -112,8 +112,8 @@
           </div>
 
           <div class="row" style="margin-top:10px">
-            <button id="addBtn" class="ok">Add / Update Product</button>
-            <button id="clearFormBtn" class="ghost">Clear form</button>
+            <button id="addBtn" class="ok" type="button">Add / Update Product</button>
+            <button id="clearFormBtn" class="ghost" type="button">Clear form</button>
           </div>
 
           <div style="margin-top:10px">
@@ -130,10 +130,10 @@
       <div class="body">
         <div class="row" style="justify-content:space-between">
           <div class="row" style="gap:8px">
-            <button id="copyTextBtn">Copy Plan (Text)</button>
-            <button id="downloadTextBtn" class="ghost">Download TXT</button>
-            <button id="importBtn" class="ghost">Import (Text)</button>
-            <button id="resetBtn" class="danger">Reset List</button>
+            <button id="copyTextBtn" type="button">Copy Plan (Text)</button>
+            <button id="downloadTextBtn" class="ghost" type="button">Download TXT</button>
+            <button id="importBtn" class="ghost" type="button">Import (Text)</button>
+            <button id="resetBtn" class="danger" type="button">Reset List</button>
           </div>
           <div><span class="tiny muted">Auto-saved to your browser (localStorage)</span></div>
         </div>
@@ -152,7 +152,7 @@
       <h2>Interactions, Dosage & Timing Analysis</h2>
       <div class="body">
         <div class="row">
-          <button id="analyzeBtn">Analyze Now</button>
+          <button id="analyzeBtn" type="button">Analyze Now</button>
           <span class="tiny muted">Educational info only. Not a substitute for professional advice.</span>
         </div>
 
@@ -178,18 +178,28 @@
   </main>
 
 <script type="module">
+/* ===== Safety net: surface any script errors so buttons never fail silently ===== */
+window.addEventListener("error", function(e){
+  const el = document.getElementById("diag");
+  if (el){
+    const d = document.createElement("div");
+    d.textContent = "Script error: " + (e && e.message ? e.message : String(e));
+    el.prepend(d);
+  }
+});
+
 /* ---------------- Utilities ---------------- */
 const $ = s => document.querySelector(s);
 const log = (...a)=>{ const el=$("#diag"); if(!el) return; const line=document.createElement("div"); line.textContent=a.join(" "); el.prepend(line); };
-function uuid(){ try{ return crypto.randomUUID(); }catch{ return "id-"+Math.random().toString(36).slice(2); } }
+function uuid(){ try{ return crypto.randomUUID(); }catch(_){ return "id-"+Math.random().toString(36).slice(2); } }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
 function normalizePhrase(s){
   return String(s||"")
     .toLowerCase()
-    .replace(/['’]/g, "")          // drop apostrophes
-    .replace(/[._/()\-]+/g, " ")   // unify dot/slash/paren/hyphen as space
-    .replace(/\s+/g, " ")          // collapse spaces
+    .replace(/['’]/g, "")
+    .replace(/[._/()\-]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -213,9 +223,9 @@ let zxingReader = null;
 let seenCodes = new Map();
 
 /* ---------------- Storage ---------------- */
-function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(products)); }catch(e){} }
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(products)); }catch(_){ } }
 function load(){
-  try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch{ return []; }
+  try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch(_){ return []; }
 }
 
 /* ---------------- Diagnostics ---------------- */
@@ -233,7 +243,7 @@ async function listCameras(){
   try{
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter(d => d.kind==="videoinput");
-    if (!cams.length){ cameraSelect.innerHTML = `<option>No cameras found</option>`; return; }
+    if (!cams.length){ cameraSelect.innerHTML = "<option>No cameras found</option>"; return; }
     for (let i=0;i<cams.length;i++){
       const d=cams[i];
       const opt=document.createElement("option");
@@ -242,7 +252,7 @@ async function listCameras(){
       cameraSelect.appendChild(opt);
     }
     log("Video inputs:", cams.length);
-  }catch(e){ log("enumerateDevices error:", e.message); }
+  }catch(e){ log("enumerateDevices error:", e && e.message ? e.message : String(e)); }
 }
 
 async function startCamera(){
@@ -261,7 +271,7 @@ async function startCamera(){
     log("Camera started.");
   }catch(e){
     scanning=false;
-    log("getUserMedia error:", e.message);
+    log("getUserMedia error:", e && e.message ? e.message : String(e));
     alert("Could not access camera. Use HTTPS and allow permission.");
     return;
   }
@@ -279,17 +289,17 @@ function stopCamera(){
   scanning=false;
 
   if (zxingReader){
-    try{ if (zxingReader.stopContinuousDecode) zxingReader.stopContinuousDecode(); }catch(e){}
-    try{ if (zxingReader.reset) zxingReader.reset(); }catch(e){}
-    try{ if (zxingReader.stopStreams) zxingReader.stopStreams(); }catch(e){}
+    try{ if (zxingReader.stopContinuousDecode) zxingReader.stopContinuousDecode(); }catch(_){}
+    try{ if (zxingReader.reset) zxingReader.reset(); }catch(_){}
+    try{ if (zxingReader.stopStreams) zxingReader.stopStreams(); }catch(_){}
     zxingReader = null;
   }
 
   if (videoEl){
-    try{ videoEl.pause(); videoEl.srcObject = null; }catch(e){}
+    try{ videoEl.pause(); videoEl.srcObject = null; }catch(_){}
   }
   if (stream){
-    try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){}
+    try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){}
     stream = null;
   }
   log("Camera stopped.");
@@ -297,7 +307,14 @@ function stopCamera(){
 
 /* Native BarcodeDetector loop */
 async function nativeLoop(){
-  const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','itf','code_39','qr_code']});
+  let detector;
+  try{
+    detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','itf','code_39','qr_code']});
+  }catch(e){
+    log("BarcodeDetector init failed:", e && e.message ? e.message : String(e));
+    await startZXing();
+    return;
+  }
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -316,7 +333,7 @@ async function nativeLoop(){
           }
         }
       }
-    }catch(e){ /* ignore transient */ }
+    }catch(_){ }
     requestAnimationFrame(tick);
   };
   tick();
@@ -325,17 +342,16 @@ async function nativeLoop(){
 /* ZXing loader (normalize exports; no hints) */
 async function loadZXing(){
   const urls = [
-    'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm',
-    'https://unpkg.com/@zxing/browser@0.1.5/esm/index.js',
-    'https://cdn.skypack.dev/@zxing/browser@0.1.5'
+    "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm",
+    "https://unpkg.com/@zxing/browser@0.1.5/esm/index.js",
+    "https://cdn.skypack.dev/@zxing/browser@0.1.5"
   ];
   for (let i=0;i<urls.length;i++){
     const u = urls[i];
     try{
       log("Loading ZXing:", u);
       const mod = await import(/* @vite-ignore */ u);
-      // Normalize export shapes (some CDNs use default export)
-      const ZX = Object.assign({}, mod, (mod && typeof mod==='object' && mod.default ? mod.default : {}));
+      const ZX = Object.assign({}, mod, (mod && typeof mod==="object" && mod.default ? mod.default : {}));
       log("ZXing exports:", Object.keys(ZX).join(", "));
       return ZX;
     }catch(e){ log("ZXing load failed:", e && e.message ? e.message : String(e)); }
@@ -346,28 +362,20 @@ async function loadZXing(){
 async function startZXing(){
   try{
     const ZX = await loadZXing();
+    const ReaderClass = ZX.BrowserMultiFormatContinuousReader || ZX.BrowserMultiFormatReader;
+    if (!ReaderClass) throw new Error("ZXing reader class not found");
 
-    const ReaderClass =
-      ZX.BrowserMultiFormatContinuousReader ||
-      ZX.BrowserMultiFormatReader;
-
-    if (!ReaderClass) {
-      throw new Error("ZXing reader class not found");
-    }
-
-    // Create reader WITHOUT hints (avoids DecodeHintType issues)
     zxingReader = new ReaderClass(undefined, {
       delayBetweenScanAttempts: 60,
       delayBetweenScanSuccess: 300
     });
 
     const deviceId = cameraSelect.value || null;
-
     const decode = zxingReader.decodeFromVideoDevice
       ? function(d, el, cb){ return zxingReader.decodeFromVideoDevice(d, el, cb); }
       : zxingReader.decodeFromConstraints
       ? function(d, el, cb){
-          const constraints = { video: d ? { deviceId: { exact: d } } : { facingMode: { ideal: 'environment' } } };
+          const constraints = { video: d ? { deviceId: { exact: d } } : { facingMode: { ideal: "environment" } } };
           return zxingReader.decodeFromConstraints(constraints, el, cb);
         }
       : null;
@@ -376,9 +384,9 @@ async function startZXing(){
 
     await decode(deviceId, videoEl, function(result, err){
       if (result){
-        try{ handleCode(String(result.getText())); }catch(e){}
+        try{ handleCode(String(result.getText())); }catch(_){}
       }
-      // transient errors ignored
+      // Ignore transient errors
     });
 
     log("ZXing reader running.");
@@ -447,21 +455,20 @@ function clearForm(){
 function renderList(){
   productListEl.innerHTML="";
   if (!products.length){
-    productListEl.innerHTML = `<div class="tiny muted">No products yet. Scan or add manually.</div>`;
+    productListEl.innerHTML = '<div class="tiny muted">No products yet. Scan or add manually.</div>';
     return;
   }
   for (let i=0;i<products.length;i++){
     const p = products[i];
     const div = document.createElement("div"); div.className="item";
     const left = document.createElement("div");
-    const ing = (p.ingredients && p.ingredients.length) ? (`<div class="tiny muted">Ingredients: ${esc(p.ingredients.join(", "))}</div>`) : "";
-    left.innerHTML = `
-      <div><strong>${esc(p.name)}</strong> ${p.type!=="unknown"?`<span class="pill tiny">${esc(p.type)}</span>`:""}</div>
-      <div class="tiny mono muted">${p.barcode ? "Barcode: "+esc(p.barcode) : "No barcode"} • ${p.classHint?`Class: ${esc(p.classHint)} • `:""}Count: ${p.count||1}</div>
-      ${ing}
-    `;
+    const ing = (p.ingredients && p.ingredients.length) ? ('<div class="tiny muted">Ingredients: '+esc(p.ingredients.join(", "))+'</div>') : "";
+    left.innerHTML = ''
+      + '<div><strong>'+esc(p.name)+'</strong> '+(p.type!=="unknown"?'<span class="pill tiny">'+esc(p.type)+'</span>':"")+'</div>'
+      + '<div class="tiny mono muted">'+(p.barcode ? "Barcode: "+esc(p.barcode) : "No barcode")+' • '+(p.classHint?('Class: '+esc(p.classHint)+' • '):"")+'Count: '+(p.count||1)+'</div>'
+      + ing;
     const right = document.createElement("div"); right.className="row";
-    const editBtn = document.createElement("button"); editBtn.className="ghost"; editBtn.textContent="Edit";
+    const editBtn = document.createElement("button"); editBtn.className="ghost"; editBtn.type="button"; editBtn.textContent="Edit";
     editBtn.onclick = function(){
       $("#barcodeInput").value = p.barcode;
       $("#nameInput").value = p.name;
@@ -470,7 +477,7 @@ function renderList(){
       $("#ingredientsInput").value = (p.ingredients||[]).join(", ");
       window.scrollTo({top:0,behavior:"smooth"});
     };
-    const delBtn = document.createElement("button"); delBtn.className="danger"; delBtn.textContent="Remove";
+    const delBtn = document.createElement("button"); delBtn.className="danger"; delBtn.type="button"; delBtn.textContent="Remove";
     delBtn.onclick = function(){
       if (confirm('Remove "'+p.name+'"?')){
         products = products.filter(x=>x!==p);
@@ -566,7 +573,6 @@ const KNOW = (function(){
     "coq10": ["ubiquinone","ubiquinol","co-enzyme q10","coenzyme q10"],
     "probiotic": ["lactobacillus","bifidobacterium","saccharomyces boulardii","probiotics"],
     "grapefruit": ["grapefruit extract","grapefruit juice"],
-    "starch": [],
 
     // Drugs / classes
     "cyclophosphamide": ["cytoxan","endoxan"],
@@ -590,7 +596,8 @@ const KNOW = (function(){
 
   function canonize(s){
     s = String(s||"").toLowerCase().trim();
-    for (const [canon, alts] of synonyms){
+    for (const pair of synonyms){
+      const canon = pair[0]; const alts = pair[1];
       if (s===canon) return canon;
       for (let i=0;i<alts.length;i++){ if (alts[i]===s) return canon; }
     }
@@ -598,9 +605,9 @@ const KNOW = (function(){
   }
 
   const checks = [
-    // Specific: Cyclophosphamide + St John's Wort
-    ({has})=>{
-      if (has("cyclophosphamide") && has("st johns wort")){
+    // Cyclophosphamide + St John's Wort
+    function(ctx){
+      if (ctx.has("cyclophosphamide") && ctx.has("st johns wort")){
         return {
           severity:"moderate",
           title:"Cyclophosphamide + St John’s Wort",
@@ -611,8 +618,8 @@ const KNOW = (function(){
     },
 
     // Broad enzyme induction warning for SJW
-    ({has})=>{
-      if (has("st johns wort")){
+    function(ctx){
+      if (ctx.has("st johns wort")){
         return {severity:"moderate", title:"St John’s Wort – Enzyme Induction",
           message:"Can lower levels of many medications via enzyme induction (not comprehensive).",
           action:"Review all meds with a pharmacist if using St John’s Wort."};
@@ -620,8 +627,8 @@ const KNOW = (function(){
     },
 
     // Warfarin + Vitamin K
-    ({has})=>{
-      if (has("warfarin") && has("vitamin k")){
+    function(ctx){
+      if (ctx.has("warfarin") && ctx.has("vitamin k")){
         return {severity:"moderate", title:"Warfarin + Vitamin K",
           message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
           action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."};
@@ -629,8 +636,8 @@ const KNOW = (function(){
     },
 
     // Warfarin + bleeding-risk supplements
-    ({hasAny})=>{
-      if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
+    function(ctx){
+      if (ctx.hasAny(["warfarin"]) && ctx.hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
         return {severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
           message:"Potential additive bleeding tendency.",
           action:"Monitor for bleeding/bruising; discuss with clinician."};
@@ -638,8 +645,8 @@ const KNOW = (function(){
     },
 
     // Serotonergic combinations
-    ({hasAny})=>{
-      if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])){
+    function(ctx){
+      if (ctx.hasAny(["ssri","snri","maoi"]) && ctx.hasAny(["5-htp","sam-e","st johns wort"])){
         return {severity:"high", title:"Serotonergic Combination",
           message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise serotonin syndrome risk.",
           action:"Avoid combining or use only under medical supervision."};
@@ -647,8 +654,8 @@ const KNOW = (function(){
     },
 
     // Thyroid + minerals
-    ({hasAny, has})=>{
-      if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) {
+    function(ctx){
+      if (ctx.has("thyroid") && ctx.hasAny(["iron","calcium","magnesium"])) {
         return {severity:"moderate", title:"Thyroid + Minerals",
           message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
           action:"Separate by at least 4 hours."};
@@ -656,8 +663,8 @@ const KNOW = (function(){
     },
 
     // Antibiotics (chelation) + minerals
-    ({hasAny})=>{
-      if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) {
+    function(ctx){
+      if (ctx.hasAny(["quinolone","tetracycline"]) && ctx.hasAny(["magnesium","calcium","iron","zinc"])) {
         return {severity:"moderate", title:"Antibiotic + Minerals",
           message:"Minerals can chelate with quinolones/tetracyclines and reduce absorption.",
           action:"Separate by 2–4 hours (follow label)."};
@@ -665,8 +672,8 @@ const KNOW = (function(){
     },
 
     // Statin + grapefruit
-    ({has})=>{
-      if (has("statin") && has("grapefruit")) {
+    function(ctx){
+      if (ctx.has("statin") && ctx.has("grapefruit")) {
         return {severity:"moderate", title:"Statin + Grapefruit",
           message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
           action:"Avoid grapefruit unless your statin is known to be unaffected."};
@@ -674,8 +681,8 @@ const KNOW = (function(){
     },
 
     // ACE/ARB + potassium
-    ({hasAny})=>{
-      if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) {
+    function(ctx){
+      if (ctx.hasAny(["ace/arb"]) && ctx.hasAny(["potassium","potassium citrate","potassium chloride"])) {
         return {severity:"moderate", title:"ACE/ARB + Potassium",
           message:"May increase potassium levels.",
           action:"Avoid extra potassium unless prescribed; monitor if directed."};
@@ -683,8 +690,8 @@ const KNOW = (function(){
     },
 
     // Anticoagulant + bleeding-risk supplements (non-warfarin)
-    ({hasAny})=>{
-      if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) {
+    function(ctx){
+      if (ctx.hasAny(["anticoagulant"]) && ctx.hasAny(["fish oil","curcumin"])) {
         return {severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
           message:"Potential additive bleeding risk.",
           action:"Use cautiously; discuss with clinician."};
@@ -692,8 +699,8 @@ const KNOW = (function(){
     },
 
     // Berberine + glucose-lowering meds
-    ({hasAny})=>{
-      if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
+    function(ctx){
+      if (ctx.hasAny(["berberine"]) && ctx.hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
         return {severity:"low", title:"Berberine + Glucose-Lowering Meds",
           message:"May enhance glucose-lowering effects.",
           action:"Monitor glucose and discuss adjustments with clinician."};
@@ -709,16 +716,16 @@ const KNOW = (function(){
     {key:"calcium", dosage:"500–1000 mg/day (split)", times:"1–2×/day", timing:"Carbonate with meals; Citrate any time; separate from iron/thyroid ≥4 h.", withFood:"Prefer with meals (esp. carbonate)."},
     {key:"iron", dosage:"18–65 mg elemental/day (per label)", times:"1×/day", timing:"Best on empty stomach with vitamin C; separate from calcium/thyroid ≥4 h; avoid coffee/tea near dose.", withFood:"Small snack if GI upset."},
     {key:"vitamin d", dosage:"1000–4000 IU/day", times:"1×/day", timing:"Any time.", withFood:"With a meal containing fat."},
-    {key:"vitamin k", dosage:"Per label (varies by MK-4/MK-7)", times:"1×/day", timing:"Consistency matters if on warfarin.", withFood:"With meals (fat helps)."},
-    {key:"vitamin a", dosage:"Per label (avoid excess >10,000 IU/day unless directed)", times:"1×/day", timing:"Any time.", withFood:"With fat."},
+    {key:"vitamin k", dosage:"Per label (MK-4/MK-7 vary)", times:"1×/day", timing:"Consistency matters if on warfarin.", withFood:"With meals (fat helps)."},
+    {key:"vitamin a", dosage:"Per label (avoid >10,000 IU/day unless directed)", times:"1×/day", timing:"Any time.", withFood:"With fat."},
     {key:"vitamin e", dosage:"100–200 IU/day", times:"1×/day", timing:"Any time.", withFood:"With fat."},
     {key:"fish oil", dosage:"1–3 g/day EPA+DHA combined", times:"1–2×/day", timing:"Any time.", withFood:"With meals (fat helps; reduces burps)."},
     {key:"coq10", dosage:"100–200 mg/day", times:"1×/day", timing:"Any time.", withFood:"With fat-containing meal."},
-    {key:"curcumin", dosage:"500–1000 mg/day (std. extract)", times:"1–2×/day", timing:"Any time.", withFood:"With meals; piperine enhances absorption."},
+    {key:"curcumin", dosage:"500–1000 mg/day (standardized extract)", times:"1–2×/day", timing:"Any time.", withFood:"With meals; piperine enhances absorption."},
     {key:"probiotic", dosage:"Per label (e.g., 10–20B CFU)", times:"1×/day", timing:"With a meal or 30 min before; separate from antibiotics by 2–3 h.", withFood:"With meal is fine."},
     {key:"melatonin", dosage:"0.5–5 mg", times:"1×/night", timing:"30–60 min before bed; avoid driving thereafter.", withFood:"With or without food."},
 
-    // Safe, non-specific entries for Rx classes/agents
+    // Rx / classes (dosage is patient-specific)
     {key:"ace/arb", dosage:"As prescribed", times:"1×/day", timing:"Any time; monitor BP; avoid high-potassium supplements unless directed.", withFood:"With or without food."},
     {key:"thyroid", dosage:"As prescribed", times:"1×/day", timing:"Empty stomach with water; 30–60 min before breakfast; separate minerals/supps ≥4 h.", withFood:"Empty stomach required."},
     {key:"ppi", dosage:"As prescribed", times:"1×/day", timing:"30–60 min before first meal.", withFood:"Before meal."},
@@ -795,13 +802,13 @@ function renderAnalysis(){
 
   interactionsEl.innerHTML = "";
   if (!interactions.length){
-    interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected from available info. Not a guarantee of safety—verify with a pharmacist.</div>`;
+    interactionsEl.innerHTML = '<div class="tiny good">No rule-based conflicts detected from available info. Not a guarantee of safety—verify with a pharmacist.</div>';
   } else {
     const ul = document.createElement("ul"); ul.style.margin="0"; ul.style.paddingLeft="18px";
     for (let i=0;i<interactions.length;i++){
       const item = interactions[i];
       const li = document.createElement("li");
-      li.innerHTML = `<span class="${item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':'')}"><strong>${esc(item.title)}</strong></span> — ${esc(item.message)} ${item.action?`<em>Action:</em> ${esc(item.action)}`:""}`;
+      li.innerHTML = '<span class="'+(item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':''))+'"><strong>'+esc(item.title)+'</strong></span> — '+esc(item.message)+' '+(item.action?('<em>Action:</em> '+esc(item.action)):"");
       ul.appendChild(li);
     }
     interactionsEl.appendChild(ul);
@@ -809,13 +816,13 @@ function renderAnalysis(){
 
   timingUIEl.innerHTML="";
   if (!perProd.length){
-    timingUIEl.innerHTML = `<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>`;
+    timingUIEl.innerHTML = '<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>';
   } else {
     const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="18px";
     for (let i=0;i<perProd.length;i++){
       const r = perProd[i];
       const li = document.createElement("li");
-      li.innerHTML = `<strong>${esc(capitalize(r.key))}</strong> — <em>${esc(r.dosage)}</em>; ${esc(r.times)}; ${esc(r.timing)} ${r.withFood?`• With food: ${esc(r.withFood)}`:""}`;
+      li.innerHTML = '<strong>'+esc(capitalize(r.key))+'</strong> — <em>'+esc(r.dosage)+'</em>; '+esc(r.times)+'; '+esc(r.timing)+' '+(r.withFood?('• With food: '+esc(r.withFood)):"");
       ul2.appendChild(li);
     }
     timingUIEl.appendChild(ul2);
@@ -825,29 +832,29 @@ function renderAnalysis(){
 }
 
 /* ---------------- Event Listeners ---------------- */
-document.getElementById("startBtn").addEventListener("click", startCamera);
-document.getElementById("stopBtn").addEventListener("click", stopCamera);
-document.getElementById("forceZXingBtn").addEventListener("click", function(){
+document.getElementById("startBtn")?.addEventListener("click", startCamera);
+document.getElementById("stopBtn")?.addEventListener("click", stopCamera);
+document.getElementById("forceZXingBtn")?.addEventListener("click", function(){
   forceZXing=true;
   if (scanning) startCamera();
 });
 
-document.getElementById("addBtn").addEventListener("click", addOrUpdate);
-document.getElementById("clearFormBtn").addEventListener("click", clearForm);
+document.getElementById("addBtn")?.addEventListener("click", addOrUpdate);
+document.getElementById("clearFormBtn")?.addEventListener("click", clearForm);
 
-document.getElementById("analyzeBtn").addEventListener("click", renderAnalysis);
+document.getElementById("analyzeBtn")?.addEventListener("click", renderAnalysis);
 
-document.getElementById("copyTextBtn").addEventListener("click", async function(){
+document.getElementById("copyTextBtn")?.addEventListener("click", async function(){
   await navigator.clipboard.writeText(buildTextPlan(products));
   alert("Copied the plain-text plan to clipboard.");
 });
-document.getElementById("downloadTextBtn").addEventListener("click", function(){
+document.getElementById("downloadTextBtn")?.addEventListener("click", function(){
   const blob = new Blob([buildTextPlan(products)], {type:"text/plain"});
   const url = URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download="supplement-med-plan.txt"; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
 });
-document.getElementById("importBtn").addEventListener("click", function(){
+document.getElementById("importBtn")?.addEventListener("click", function(){
   const txt = prompt("Paste a plain-text plan created by this app. (Existing entries will be merged.)");
   if (!txt) return;
   try{
@@ -863,7 +870,7 @@ document.getElementById("importBtn").addEventListener("click", function(){
     alert("Imported.");
   }catch(e){ alert("Import failed: " + (e && e.message ? e.message : String(e))); }
 });
-document.getElementById("resetBtn").addEventListener("click", function(){
+document.getElementById("resetBtn")?.addEventListener("click", function(){
   if (!confirm("Clear saved products?")) return;
   products = []; save(); renderList(); updateTextPreview();
 });
@@ -871,7 +878,7 @@ document.getElementById("resetBtn").addEventListener("click", function(){
 /* ---------------- Init ---------------- */
 (async function init(){
   selfTest();
-  engineNameEl.textContent = ('BarcodeDetector' in window && !forceZXing) ? "BarcodeDetector" : "ZXing";
+  engineNameEl.textContent = ("BarcodeDetector" in window && !forceZXing) ? "BarcodeDetector" : "ZXing";
   renderList(); updateTextPreview();
   try{
     await listCameras();
@@ -883,7 +890,7 @@ document.getElementById("resetBtn").addEventListener("click", function(){
           const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
           temp.getTracks().forEach(function(t){t.stop();});
           await listCameras();
-        }catch(e){}
+        }catch(_){}
       }
     }
   }catch(e){ log("Init error:", e && e.message ? e.message : String(e)); }
@@ -892,7 +899,7 @@ document.getElementById("resetBtn").addEventListener("click", function(){
 
 <footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
   <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
-  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.5 (phrase matching + SJW/cyclophosphamide + dosage)</div>
+  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.6 (stable buttons + ZXing-safe + phrase matching + dosages)</div>
 </footer>
 </body>
 </html>
