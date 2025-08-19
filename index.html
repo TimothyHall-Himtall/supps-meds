@@ -1,9 +1,14 @@
+Love the progress—and thanks for the specific notes. I fixed the ZXing loader, added a per-product **dosage & timing guide**, and switched the export to a **simple text plan** (copy/download). Here’s a fresh single-file app—drop it in GitHub Pages (or any HTTPS host) as `index.html`.
+
+---
+
+```html
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Supplement & Medication Scanner – Interactions & Timing</title>
+<title>Supplement & Medication Scanner – Interactions, Dosage & Timing</title>
 <meta name="theme-color" content="#0ea5e9">
 <style>
   :root{--bg:#0b1220;--panel:#121a2a;--muted:#9fb3c8;--text:#e6f1ff;--accent:#0ea5e9;--danger:#ef4444;--ok:#22c55e;--warn:#f59e0b}
@@ -36,18 +41,19 @@
   .section-title{margin:0 0 6px 0;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
   .small{font-size:12px} .tiny{font-size:11px}
   .kbd{font-family:ui-monospace,monospace;font-size:12px;border:1px solid #274066;background:#0b1424;padding:2px 6px;border-radius:6px}
+  .pre{white-space:pre; font-family:ui-monospace,monospace; font-size:13px; background:#0a1324; border:1px dashed #274066; border-radius:10px; padding:10px;}
 </style>
 </head>
 <body>
   <header>
     <h1>Supplement & Medication Scanner</h1>
-    <span class="tag">barcode → interactions + timing</span>
-    <span class="tag">works in Safari / Chrome / Edge</span>
+    <span class="tag">barcode → interactions + dosage & timing</span>
+    <span class="tag">Safari / Chrome / Edge</span>
   </header>
 
   <main>
     <div class="grid">
-      <!-- LEFT: Scanner + Add Product -->
+      <!-- LEFT: Scanner -->
       <section class="card">
         <h2>Scan</h2>
         <div class="body">
@@ -59,6 +65,7 @@
             <div class="row" style="align-self:end">
               <button id="startBtn">Start Camera</button>
               <button class="ghost" id="stopBtn">Stop</button>
+              <button class="ghost" id="forceZXingBtn" title="Force the ZXing fallback if native API misbehaves">Force ZXing</button>
               <span id="engineTag" class="pill"><span>Engine:</span><strong id="engineName" class="mono">…</strong></span>
             </div>
           </div>
@@ -73,6 +80,7 @@
         </div>
       </section>
 
+      <!-- RIGHT: Add product -->
       <section class="card">
         <h2>Add Product (Manual or after Scan)</h2>
         <div class="body">
@@ -126,25 +134,30 @@
       <div class="body">
         <div class="row" style="justify-content:space-between">
           <div class="row" style="gap:8px">
-            <button id="copyListBtn">Copy List (JSON)</button>
-            <button id="exportFileBtn" class="ghost">Download JSON</button>
-            <button id="importBtn" class="ghost">Import from JSON</button>
+            <button id="copyTextBtn">Copy Plan (Text)</button>
+            <button id="downloadTextBtn" class="ghost">Download TXT</button>
+            <button id="importBtn" class="ghost">Import (Text)</button>
             <button id="resetBtn" class="danger">Reset List</button>
           </div>
           <div><span class="tiny muted">Auto-saved to your browser (localStorage)</span></div>
         </div>
 
         <div id="productList" class="list" style="margin-top:12px"></div>
+
+        <div style="margin-top:12px">
+          <div class="section-title">Plain-Text Plan Preview</div>
+          <div id="textPreview" class="pre tiny">—</div>
+        </div>
       </div>
     </section>
 
     <!-- Analysis -->
     <section class="card">
-      <h2>Interactions & Timing Analysis</h2>
+      <h2>Interactions, Dosage & Timing Analysis</h2>
       <div class="body">
         <div class="row">
           <button id="analyzeBtn">Analyze Now</button>
-          <span class="tiny muted">Educational information. Not a substitute for professional advice. Consult your pharmacist/clinician.</span>
+          <span class="tiny muted">Educational info only. Not a substitute for professional advice.</span>
         </div>
 
         <div style="margin-top:14px">
@@ -153,13 +166,13 @@
         </div>
 
         <div style="margin-top:14px">
-          <div class="section-title">Timing & With-Food Recommendations</div>
+          <div class="section-title">Per-Product Dosage & Timing</div>
           <div id="timing"></div>
         </div>
       </div>
     </section>
 
-    <!-- Log / Debug -->
+    <!-- Diagnostics -->
     <section class="card">
       <h2>Diagnostics</h2>
       <div class="body">
@@ -179,41 +192,39 @@ const lastCodeEl = $("#lastCode");
 const productListEl = $("#productList");
 const interactionsEl = $("#interactions");
 const timingEl = $("#timing");
-const LS_KEY = "scannedProducts_v2";
+const textPreviewEl = $("#textPreview");
+const LS_KEY = "scannedProducts_v3_textplan";
 
 let products = load();
-renderList();
+renderList(); updateTextPreview();
 
 /* ---------- Camera & Scanning ---------- */
 const videoEl = $("#preview");
 const cameraSelect = $("#cameraSelect");
 const startBtn = $("#startBtn");
 const stopBtn = $("#stopBtn");
+const forceZXingBtn = $("#forceZXingBtn");
 
 let stream = null;
 let scanning = false;
-let usingNative = false;
+let useZXingOnly = false; // toggled by "Force ZXing"
 let zxingReader = null;
-let seenCodes = new Map(); // code -> timestamp to de-dup
+let usingNative = false;
+let seenCodes = new Map(); // code -> timestamp
 
 async function listCameras(){
   cameraSelect.innerHTML = "";
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter(d => d.kind==="videoinput");
-    if (!cams.length) {
-      cameraSelect.innerHTML = `<option>No cameras found</option>`;
-      return;
-    }
+    if (!cams.length) { cameraSelect.innerHTML = `<option>No cameras found</option>`; return; }
     cams.forEach((d,i)=>{
       const opt=document.createElement("option");
       opt.value=d.deviceId;
       opt.textContent=d.label || `Camera ${i+1}`;
       cameraSelect.appendChild(opt);
     });
-  } catch(e){
-    log("enumerateDevices error:", e.message);
-  }
+  } catch(e){ log("enumerateDevices error:", e.message); }
 }
 
 async function startCamera(){
@@ -221,11 +232,7 @@ async function startCamera(){
   scanning = true;
 
   const deviceId = cameraSelect.value || undefined;
-  const constraints = {
-    audio:false,
-    video: deviceId ? {deviceId: {exact: deviceId}} :
-                      {facingMode: {ideal: "environment"}}
-  };
+  const constraints = { audio:false, video: deviceId ? {deviceId:{exact:deviceId}} : {facingMode:{ideal:"environment"}} };
 
   try{
     stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -233,38 +240,32 @@ async function startCamera(){
     await videoEl.play();
     log("Camera started.");
   }catch(e){
-    scanning=false;
-    log("getUserMedia error:", e.message);
-    alert("Could not access camera. Make sure you're on HTTPS and allowed camera permissions.");
+    scanning=false; log("getUserMedia error:", e.message);
+    alert("Could not access camera. Use HTTPS and allow permission.");
     return;
   }
 
-  if ('BarcodeDetector' in window) {
-    usingNative = true;
-    engineNameEl.textContent = "BarcodeDetector";
-    nativeLoop();
+  if (!useZXingOnly && 'BarcodeDetector' in window) {
+    usingNative = true; engineNameEl.textContent = "BarcodeDetector"; nativeLoop();
   } else {
-    usingNative = false;
-    engineNameEl.textContent = "ZXing";
-    await startZXing();
+    usingNative = false; engineNameEl.textContent = "ZXing"; await startZXing();
   }
 }
 
 function stopCamera(){
   scanning=false;
-  if (zxingReader) {
-    try { zxingReader.stopContinuousDecode(); } catch {}
-  }
+  if (zxingReader) { try { zxingReader.stopContinuousDecode(); } catch {} }
   if (videoEl) { videoEl.pause(); videoEl.srcObject = null; }
-  if (stream) {
-    stream.getTracks().forEach(t=>t.stop());
-    stream=null;
-  }
+  if (stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
   log("Camera stopped.");
 }
 
 startBtn.addEventListener("click", startCamera);
 stopBtn.addEventListener("click", stopCamera);
+forceZXingBtn.addEventListener("click", ()=>{
+  useZXingOnly = true;
+  if (scanning) startCamera(); // restart in ZXing mode
+});
 
 /* Native BarcodeDetector loop */
 async function nativeLoop(){
@@ -279,22 +280,38 @@ async function nativeLoop(){
       if (w && h){
         canvas.width=w; canvas.height=h;
         ctx.drawImage(videoEl, 0,0,w,h);
-        const bitmap = canvas;
-        const codes = await detector.detect(bitmap);
+        const codes = await detector.detect(canvas);
         if (codes && codes.length){
-          for (const c of codes) handleCode(c.rawValue || c.rawValue === 0 ? String(c.rawValue) : String(c));
+          for (const c of codes) handleCode(String(c.rawValue || c));
         }
       }
-    }catch(e){ /* swallow intermittent */ }
+    }catch(e){ /* intermittent errors are normal */ }
     requestAnimationFrame(tick);
   };
   tick();
 }
 
-/* ZXing fallback */
+/* ZXing fallback with robust loader */
+async function loadZXing(){
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm',
+    'https://unpkg.com/@zxing/browser@0.1.5/esm/index.js',
+    'https://cdn.skypack.dev/@zxing/browser@0.1.5'
+  ];
+  for (const u of urls){
+    try {
+      log("Loading ZXing from:", u);
+      const mod = await import(/* @vite-ignore */ u);
+      log("ZXing loaded from:", u);
+      return mod;
+    } catch(e){ log("ZXing load failed from", u, e.message); }
+  }
+  throw new Error("All ZXing CDNs failed.");
+}
+
 async function startZXing(){
   try{
-    const mod = await import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm');
+    const mod = await loadZXing();
     const {BrowserMultiFormatContinuousReader, DecodeHintType, BarcodeFormat} = mod;
 
     const hints = new Map();
@@ -304,18 +321,16 @@ async function startZXing(){
       BarcodeFormat.CODE_128, BarcodeFormat.ITF
     ]);
 
-    zxingReader = new BrowserMultiFormatContinuousReader(hints, {delayBetweenScanAttempts: 75, delayBetweenScanSuccess: 350});
-    await zxingReader.decodeFromVideoDevice(cameraSelect.value || null, videoEl, (result, err, controls)=>{
-      if (result) {
-        handleCode(String(result.getText()));
-      }
-      if (err) { /* ignore frequent decode errors */ }
+    zxingReader = new BrowserMultiFormatContinuousReader(hints, {delayBetweenScanAttempts: 60, delayBetweenScanSuccess: 300});
+    await zxingReader.decodeFromVideoDevice(cameraSelect.value || null, videoEl, (result, err)=>{
+      if (result) handleCode(String(result.getText()));
+      /* frequent decode errors are expected; ignored */
     });
     log("ZXing reader running.");
   } catch(e){
     engineNameEl.textContent = "ZXing (load failed)";
-    log("Failed to load ZXing:", e.message);
-    alert("BarcodeDetector not supported and ZXing failed to load. You can still add items manually.");
+    log("Failed to start ZXing:", e.message);
+    alert("ZXing fallback failed to load. You can still add items manually.");
   }
 }
 
@@ -323,23 +338,19 @@ async function startZXing(){
 function handleCode(code){
   const now = Date.now();
   const last = seenCodes.get(code) || 0;
-  if (now - last < 1200) return; // throttle duplicates
+  if (now - last < 1200) return;
   seenCodes.set(code, now);
 
   lastCodeEl.textContent = code;
   $("#barcodeInput").value = code;
 
-  // If the product is already in list, just highlight & return
   const idx = products.findIndex(p => p.barcode === code);
   if (idx >= 0) {
     products[idx].count = (products[idx].count||1)+1;
-    save(); renderList();
+    save(); renderList(); updateTextPreview();
     return;
   }
-
-  // Pre-fill a placeholder name; user can edit
   $("#nameInput").value ||= `Product ${code}`;
-  // Try to guess type unknown
   $("#typeInput").value = "unknown";
 }
 
@@ -353,10 +364,7 @@ $("#addBtn").addEventListener("click", ()=>{
     ? $("#ingredientsInput").value.split(",").map(s=>s.trim()).filter(Boolean)
     : [];
 
-  if (!barcode && !name){
-    alert("Enter at least a barcode or a product name.");
-    return;
-  }
+  if (!barcode && !name){ alert("Enter at least a barcode or a product name."); return; }
 
   const existingIdx = barcode ? products.findIndex(p => p.barcode===barcode) : -1;
   const product = {
@@ -370,34 +378,30 @@ $("#addBtn").addEventListener("click", ()=>{
   if (existingIdx>=0) products[existingIdx] = {...products[existingIdx], ...product};
   else products.unshift(product);
 
-  save(); renderList();
+  save(); renderList(); updateTextPreview();
 });
 
 $("#clearFormBtn").addEventListener("click", ()=>{
-  $("#barcodeInput").value="";
-  $("#nameInput").value="";
-  $("#typeInput").value="supplement";
-  $("#classInput").value="";
+  $("#barcodeInput").value=""; $("#nameInput").value="";
+  $("#typeInput").value="supplement"; $("#classInput").value="";
   $("#ingredientsInput").value="";
 });
 
 function renderList(){
   productListEl.innerHTML="";
   if (!products.length){
-    productListEl.innerHTML = `<div class="muted tiny">No products yet. Scan a barcode or add manually.</div>`;
+    productListEl.innerHTML = `<div class="muted tiny">No products yet. Scan or add manually.</div>`;
     return;
   }
   for (const p of products){
-    const div = document.createElement("div");
-    div.className = "item";
+    const div = document.createElement("div"); div.className = "item";
     const left = document.createElement("div");
     left.innerHTML = `
       <div><strong>${escapeHTML(p.name)}</strong> ${p.type!=="unknown"?`<span class="pill tiny">${p.type}</span>`:""}</div>
       <div class="tiny mono muted">${p.barcode ? "Barcode: "+escapeHTML(p.barcode) : "No barcode"} • ${p.classHint?`Class: ${escapeHTML(p.classHint)} • `:""}Count: ${p.count||1}</div>
       ${p.ingredients?.length? `<div class="tiny muted">Ingredients: ${escapeHTML(p.ingredients.join(", "))}</div>` : ""}
     `;
-    const right = document.createElement("div");
-    right.className="row";
+    const right = document.createElement("div"); right.className="row";
     const editBtn = document.createElement("button"); editBtn.className="ghost"; editBtn.textContent="Edit";
     editBtn.onclick = ()=>{
       $("#barcodeInput").value = p.barcode;
@@ -411,7 +415,7 @@ function renderList(){
     delBtn.onclick = ()=>{
       if (confirm(`Remove "${p.name}"?`)){
         products = products.filter(x=>x!==p);
-        save(); renderList();
+        save(); renderList(); updateTextPreview();
       }
     };
     right.append(editBtn, delBtn);
@@ -420,48 +424,46 @@ function renderList(){
   }
 }
 
-/* ---------- Export / Import ---------- */
-$("#copyListBtn").addEventListener("click", async ()=>{
-  const json = JSON.stringify(products, null, 2);
-  await navigator.clipboard.writeText(json);
-  alert("Copied current list to clipboard (JSON). Paste it back later via Import.");
+/* ---------- Text Export / Import ---------- */
+$("#copyTextBtn").addEventListener("click", async ()=>{
+  const txt = buildTextPlan(products);
+  await navigator.clipboard.writeText(txt);
+  alert("Copied the plain-text plan to clipboard.");
 });
-$("#exportFileBtn").addEventListener("click", ()=>{
-  const blob = new Blob([JSON.stringify(products,null,2)], {type:"application/json"});
+$("#downloadTextBtn").addEventListener("click", ()=>{
+  const blob = new Blob([buildTextPlan(products)], {type:"text/plain"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href=url; a.download="supplement-med-list.json";
+  a.href=url; a.download="supplement-med-plan.txt";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 });
 $("#importBtn").addEventListener("click", async ()=>{
-  const txt = prompt("Paste JSON here (from a previous Copy):");
+  const txt = prompt("Paste a plain-text plan created by this app. (Existing entries will be merged by barcode/name.)");
   if (!txt) return;
   try{
-    const arr = JSON.parse(txt);
-    if (!Array.isArray(arr)) throw new Error("Not an array");
-    // merge by barcode or id
-    const byKey = new Map(products.map(p=>[(p.barcode||p.id), p]));
-    for (const p of arr){
-      const key = p.barcode||p.id;
-      byKey.set(key, {...byKey.get(key), ...p});
+    const parsed = parseTextPlan(txt);
+    // merge by barcode or name
+    const key = p => (p.barcode && p.barcode.trim()) || p.name.toLowerCase();
+    const map = new Map(products.map(p=>[key(p),p]));
+    for (const p of parsed){
+      const k = key(p); map.set(k, {...(map.get(k)||{}), ...p});
     }
-    products = Array.from(byKey.values());
-    save(); renderList();
+    products = Array.from(map.values());
+    save(); renderList(); updateTextPreview();
     alert("Imported.");
-  } catch(e){
-    alert("Import failed: " + e.message);
-  }
+  }catch(e){ alert("Import failed: " + e.message); }
 });
 $("#resetBtn").addEventListener("click", ()=>{
   if (!confirm("Clear saved products?")) return;
-  products = []; save(); renderList();
+  products = []; save(); renderList(); updateTextPreview();
 });
 
-/* ---------- Analysis (rule-based) ---------- */
+/* ---------- Analysis: Interactions + Dosage/Timing ---------- */
 $("#analyzeBtn").addEventListener("click", ()=>{
   const res = analyze(products);
   renderAnalysis(res);
+  updateTextPreview();
 });
 
 function renderAnalysis({interactions, timing}){
@@ -469,10 +471,9 @@ function renderAnalysis({interactions, timing}){
   timingEl.innerHTML = "";
 
   if (!interactions.length){
-    interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected with the info provided. This does not guarantee safety—verify with a pharmacist.</div>`;
+    interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected from available info. Not a guarantee of safety—verify with a pharmacist.</div>`;
   } else {
-    const ul = document.createElement("ul");
-    ul.style.margin="0"; ul.style.paddingLeft="18px";
+    const ul = document.createElement("ul"); ul.style.margin="0"; ul.style.paddingLeft="18px";
     for (const item of interactions){
       const li = document.createElement("li");
       li.innerHTML = `<span class="${item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':'')}"><strong>${escapeHTML(item.title)}</strong></span> — ${escapeHTML(item.message)} ${item.action?`<em>Action:</em> ${escapeHTML(item.action)}`:""}`;
@@ -482,10 +483,9 @@ function renderAnalysis({interactions, timing}){
   }
 
   if (!timing.length){
-    timingEl.innerHTML = `<div class="tiny muted">No timing advice matched your entries. Add ingredients and/or med class to get more suggestions.</div>`;
+    timingEl.innerHTML = `<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>`;
   } else {
-    const ul2 = document.createElement("ul");
-    ul2.style.margin="0"; ul2.style.paddingLeft="18px";
+    const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="18px";
     for (const t of timing){
       const li = document.createElement("li");
       li.innerHTML = `<strong>${escapeHTML(t.title)}:</strong> ${escapeHTML(t.message)}`;
@@ -495,12 +495,11 @@ function renderAnalysis({interactions, timing}){
   }
 }
 
-/* Rules: common, conservative, educational */
-const RULES = (()=>{
+/* ---------- Knowledge: rules & per-product recs ---------- */
+const KNOW = (()=>{
 
-  // Canonical names and synonyms
-  const syn = (/* map */) => new Map(Object.entries({
-    // vitamins & minerals
+  // synonyms for normalization
+  const synonyms = new Map(Object.entries({
     "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
     "vitamin d": ["vit d","cholecalciferol","d3","ergocalciferol","d2"],
     "vitamin a": ["retinol","retinyl","beta-carotene","beta carotene"],
@@ -509,18 +508,18 @@ const RULES = (()=>{
     "calcium": ["calcium carbonate","calcium citrate"],
     "magnesium": ["magnesium citrate","magnesium glycinate","magnesium oxide","magnesium malate","magnesium threonate"],
     "zinc": ["zinc picolinate","zinc citrate","zinc gluconate"],
-    "fish oil": ["omega 3","epa","dha","omega-3","fish oil concentrate","cod liver oil"],
+    "fish oil": ["omega 3","epa","dha","omega-3","fish oil concentrate","cod liver oil","omega 3 fish oil"],
     "curcumin": ["turmeric","curcuminoids"],
     "berberine": ["berberis","goldenseal"],
     "st johns wort": ["st. john's wort","hypericum"],
     "5-htp": ["5htp","5 hydroxytryptophan","l-5-htp"],
     "sam-e": ["same","s-adenosylmethionine","s adenosyl methionine"],
     "melatonin": [],
-    "coq10": ["ubiquinone","ubiquinol"],
+    "coq10": ["ubiquinone","ubiquinol","co-enzyme q10","coenzyme q10"],
     "probiotic": ["lactobacillus","bifidobacterium","saccharomyces boulardii","probiotics"],
     "grapefruit": ["grapefruit extract","grapefruit juice"],
 
-    // med classes
+    // med classes / examples
     "warfarin": ["coumadin","jantoven"],
     "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine"],
     "snri": ["venlafaxine","desvenlafaxine","duloxetine","levomilnacipran","milnacipran"],
@@ -536,8 +535,6 @@ const RULES = (()=>{
     "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"],
   }));
 
-  const synonyms = syn();
-
   function canonize(s){
     s = s.toLowerCase().trim();
     for (const [canon, alts] of synonyms){
@@ -547,9 +544,8 @@ const RULES = (()=>{
     return s;
   }
 
-  /* Interaction checks return {severity,title,message,action} */
+  // interaction checks
   const checks = [
-    // Warfarin & Vitamin K
     ({has})=>{
       if (has("warfarin") && has("vitamin k")){
         return {severity:"moderate", title:"Warfarin + Vitamin K",
@@ -557,7 +553,6 @@ const RULES = (()=>{
           action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."};
       }
     },
-    // Warfarin + fish oil/curcumin/garlic/ginkgo (bleeding risk)
     ({hasAny, has})=>{
       if (has("warfarin") && hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
         return {severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
@@ -565,7 +560,6 @@ const RULES = (()=>{
           action:"Monitor for bleeding/bruising; discuss with clinician."};
       }
     },
-    // Serotonergic combos: SSRI/SNRI/MAOI + 5-HTP / SAMe / St John's Wort
     ({hasAny})=>{
       if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])){
         return {severity:"high", title:"Serotonergic Combination",
@@ -573,15 +567,13 @@ const RULES = (()=>{
           action:"Avoid combining or use only under medical supervision."};
       }
     },
-    // St John's Wort enzyme induction
     ({has})=>{
       if (has("st johns wort")){
-        return {severity:"moderate", title:"St John’s Wort Interactions",
-          message:"Can reduce levels of many medications (e.g., oral contraceptives, cyclosporine, some anticoagulants) via CYP3A4 induction.",
+        return {severity:"moderate", title:"St John’s Wort – Enzyme Induction",
+          message:"Can reduce levels of many medications via CYP3A4 induction.",
           action:"Review all meds with a pharmacist if using St John’s Wort."};
       }
     },
-    // Thyroid meds + iron/calcium/magnesium/fiber/coffee
     ({hasAny, has})=>{
       if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) {
         return {severity:"moderate", title:"Thyroid + Minerals",
@@ -589,31 +581,27 @@ const RULES = (()=>{
           action:"Separate by at least 4 hours."};
       }
     },
-    // Antibiotics (quinolone/tetracycline) + minerals
     ({hasAny})=>{
       if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) {
         return {severity:"moderate", title:"Antibiotic + Minerals",
           message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
-          action:"Separate by 2–4 hours (follow specific label guidance)."};
+          action:"Separate by 2–4 hours (follow label)."};
       }
     },
-    // Statins + Grapefruit
-    ({has, hasAny})=>{
+    ({has})=>{
       if (has("statin") && has("grapefruit")) {
         return {severity:"moderate", title:"Statin + Grapefruit",
-          message:"Grapefruit can raise statin levels (notably simvastatin, lovastatin, atorvastatin).",
-          action:"Avoid grapefruit unless your clinician confirms your statin is unaffected."};
+          message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
+          action:"Avoid grapefruit unless clinician confirms your statin is unaffected."};
       }
     },
-    // ACE/ARB + Potassium (from supplements)
-    ({has, hasAny})=>{
-      if (has("ace/arb") && hasAny(["potassium","potassium citrate","potassium chloride"])) {
+    ({hasAny})=>{
+      if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) {
         return {severity:"moderate", title:"ACE/ARB + Potassium",
           message:"May increase potassium levels.",
           action:"Avoid extra potassium unless prescribed; monitor if directed."};
       }
     },
-    // Anticoagulants + fish oil/curcumin (non-warfarin)
     ({hasAny})=>{
       if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) {
         return {severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
@@ -621,70 +609,191 @@ const RULES = (()=>{
           action:"Use cautiously; discuss with clinician."};
       }
     },
-    // Berberine + antidiabetics (hypoglycemia potential)
-    ({has, hasAny})=>{
-      if (has("berberine") && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
+    ({hasAny})=>{
+      if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
         return {severity:"low", title:"Berberine + Glucose-Lowering Meds",
           message:"May enhance glucose-lowering effects.",
-          action:"Monitor glucose and discuss dose adjustments with clinician."};
+          action:"Monitor glucose and discuss adjustments with clinician."};
       }
     }
   ];
 
-  /* Timing suggestions return {title,message} */
-  const timing = [
-    ({has})=> has("iron") && ({title:"Iron", message:"Best on an empty stomach with vitamin C; avoid coffee/tea; separate from calcium/thyroid by 4 hours."}),
-    ({has})=> has("magnesium") && ({title:"Magnesium", message:"Often taken in evening (may relax); separate from quinolone/tetracycline antibiotics by 2–4 hours."}),
-    ({has})=> has("zinc") && ({title:"Zinc", message:"Take with food if it upsets stomach; separate from antibiotics by 2–4 hours."}),
-    ({has})=> has("calcium") && ({title:"Calcium", message:"Carbonate: with meals; Citrate: with or without food. Separate from iron/thyroid by several hours."}),
-    ({hasAny})=> (hasAny(["vitamin a","vitamin d","vitamin e","vitamin k","fish oil"])) && ({title:"Fat-soluble Vitamins & Omega-3", message:"Take with a meal containing fat for absorption."}),
-    ({has})=> has("probiotic") && ({title:"Probiotics", message:"Take with a meal or 30 min before; separate from antibiotics by 2–3 hours."}),
-    ({has})=> has("thyroid") && ({title:"Thyroid hormone", message:"Empty stomach with water; 30–60 min before breakfast; separate minerals/supplements by ≥4 hours."}),
-    ({has})=> has("bisphosphonate") && ({title:"Bisphosphonates", message:"First thing in morning with water only; stay upright 30–60 min; avoid food/supplements during that window."}),
-    ({has})=> has("melatonin") && ({title:"Melatonin", message:"30–60 min before bedtime; avoid driving/operating machinery after."}),
-    ({has})=> has("ppi") && ({title:"PPIs", message:"Often 30–60 min before first meal; verify your specific product directions."})
+  // generic dosage & timing suggestions (adults, typical label ranges)
+  // Medications: do NOT give dosing—timing only (“as prescribed”).
+  const perProduct = [
+    {key:"magnesium", dosage:"200–400 mg elemental/day", times:"1–2×/day", timing:"Evening may help relaxation; separate from certain antibiotics by 2–4 h; may reduce thyroid absorption (separate ≥4 h).", withFood:"With or without food (glycinate/citrate gentler)."},
+    {key:"zinc", dosage:"10–25 mg/day", times:"1×/day", timing:"Separate from antibiotics by 2–4 h.", withFood:"Take with food if nausea."},
+    {key:"calcium", dosage:"500–1000 mg/day (split)", times:"1–2×/day", timing:"Carbonate with meals; Citrate any time; separate from iron/thyroid ≥4 h.", withFood:"Prefer with meals (esp. carbonate)."},
+    {key:"iron", dosage:"As labeled (e.g., 18–65 mg elemental)", times:"1×/day", timing:"Best on empty stomach with vitamin C; separate from calcium/thyroid ≥4 h; avoid coffee/tea near dose.", withFood:"With small snack if GI upset."},
+    {key:"vitamin d", dosage:"1000–4000 IU/day", times:"1×/day", timing:"Any time.", withFood:"With a meal containing fat."},
+    {key:"vitamin k", dosage:"As labeled", times:"1×/day", timing:"Consistency matters if on warfarin.", withFood:"With meals (fat helps)."},
+    {key:"vitamin a", dosage:"As labeled", times:"1×/day", timing:"Any time.", withFood:"With fat."},
+    {key:"vitamin e", dosage:"100–200 IU/day", times:"1×/day", timing:"Any time.", withFood:"With fat."},
+    {key:"fish oil", dosage:"1–3 g/day EPA+DHA combined", times:"1–2×/day", timing:"Any time.", withFood:"With meals (fat helps, reduces burps)."},
+    {key:"coq10", dosage:"100–200 mg/day", times:"1×/day", timing:"Any time.", withFood:"With fat-containing meal."},
+    {key:"curcumin", dosage:"500–1000 mg/day (std. extract)", times:"1–2×/day", timing:"Any time.", withFood:"With meals; black pepper/long pepper enhances absorption."},
+    {key:"probiotic", dosage:"As labeled (e.g., 10–20B CFU)", times:"1×/day", timing:"With a meal or 30 min before; separate from antibiotics by 2–3 h.", withFood:"With meal is fine."},
+    {key:"melatonin", dosage:"0.5–5 mg", times:"1×/night", timing:"30–60 min before bed; avoid driving thereafter.", withFood:"With or without food."},
+    {key:"berberine", dosage:"500–1500 mg/day", times:"1–3×/day", timing:"Before meals may aid glycemia; monitor if on glucose-lowering meds.", withFood:"With meals if GI upset."},
+    // timing-only meds (no dosing)
+    {key:"thyroid", dosage:"As prescribed", times:"1×/day", timing:"Empty stomach with water; 30–60 min before breakfast; separate minerals/supps ≥4 h.", withFood:"Empty stomach required."},
+    {key:"ppi", dosage:"As prescribed", times:"1×/day", timing:"30–60 min before first meal.", withFood:"Before meal."},
+    {key:"statin", dosage:"As prescribed", times:"1×/day", timing:"Evening preferred for simvastatin/lovastatin; others any time; avoid grapefruit with certain statins.", withFood:"With or without food."},
+    {key:"bisphosphonate", dosage:"As prescribed", times:"Per product", timing:"Morning, water only; stay upright 30–60 min; avoid food/supps during window.", withFood:"No—empty stomach rules."}
   ];
 
-  return {canonize, checks, timing};
+  // per-product lookup by presence in bag (first match wins)
+  function perProductAdvice(has){
+    const out = [];
+    for (const rec of perProduct){
+      if (has(rec.key)) out.push(rec);
+    }
+    return out;
+  }
+
+  return {canonize, checks, perProductAdvice};
 })();
 
 /* Analyzer */
 function analyze(items){
-  // Collect all canonical tokens from ingredients + class + name
+  // Collect canonical tokens from ingredients + class + name (split + soft matching)
   const bag = new Set();
   for (const p of items){
     const fields = [
       ...(p.ingredients||[]),
       ...(p.classHint?[p.classHint]:[]),
-      p.name||"",
-      // allow naive detection for some common words in name
+      p.name||""
     ];
     for (const raw of fields){
-      const parts = String(raw).split(/[+,/()\-]| and | with | & /i).map(s=>s.trim()).filter(Boolean);
+      const parts = String(raw).split(/[+,/()\-]| and | with | & |;|:|\s+/i).map(s=>s.trim()).filter(Boolean);
       for (const part of parts){
-        bag.add(RULES.canonize(part));
+        bag.add(KNOW.canonize(part));
       }
     }
   }
 
-  const has = (canon)=> bag.has(canon);
-  const hasAny = (arr)=> arr.some(x=>has(x));
+  // helper presence (also soft-contains over bag entries)
+  const has = (canon)=>{
+    if (bag.has(canon)) return true;
+    for (const t of bag){ if (t.includes(canon)) return true; }
+    return false;
+  };
+  const hasAny = arr => arr.some(x=>has(x));
 
+  // interactions
   const foundInteractions = [];
-  for (const fn of RULES.checks){
+  for (const fn of KNOW.checks){
     const r = fn({has,hasAny});
     if (r) foundInteractions.push(r);
   }
+  // de-dupe
+  const uniq = (arr, key) => Array.from(new Map(arr.map(o=>[o[key], o])).values());
 
-  const timing = [];
-  for (const tf of RULES.timing){
-    const r = tf({has,hasAny});
-    if (r) timing.push(r);
+  // per-product advice
+  const perProd = KNOW.perProductAdvice(has);
+
+  return {interactions: uniq(foundInteractions, "title"), perProd};
+}
+
+/* ---------- Build Per-Product Timing UI & Text Plan ---------- */
+function renderPerProduct(perProd){
+  timingEl.innerHTML = "";
+  if (!perProd.length){
+    timingEl.innerHTML = `<div class="tiny muted">No matches yet. Add ingredients or med class.</div>`;
+    return;
+  }
+  const ul = document.createElement("ul"); ul.style.margin="0"; ul.style.paddingLeft="18px";
+  for (const r of perProd){
+    const li = document.createElement("li");
+    li.innerHTML = `<strong>${escapeHTML(capitalize(r.key))}</strong> — <em>${escapeHTML(r.dosage)}</em>; ${escapeHTML(r.times)}; ${escapeHTML(r.timing)} ${r.withFood?`• With food: ${escapeHTML(r.withFood)}`:""}`;
+    ul.append(li);
+  }
+  timingEl.append(ul);
+}
+
+function renderAnalysis(res){
+  // interactions already handled above; reuse function
+  const {interactions, perProd} = res;
+  // render interactions
+  interactionsEl.innerHTML = "";
+  if (!interactions.length){
+    interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected from available info. Not a guarantee of safety—verify with a pharmacist.</div>`;
+  } else {
+    const ul = document.createElement("ul"); ul.style.margin="0"; ul.style.paddingLeft="18px";
+    for (const item of interactions){
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="${item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':'')}"><strong>${escapeHTML(item.title)}</strong></span> — ${escapeHTML(item.message)} ${item.action?`<em>Action:</em> ${escapeHTML(item.action)}`:""}`;
+      ul.append(li);
+    }
+    interactionsEl.append(ul);
+  }
+  // render per-product timing/dosage
+  renderPerProduct(perProd);
+}
+
+/* ---------- Plain-Text Plan ---------- */
+function buildTextPlan(items){
+  const {interactions, perProd} = analyze(items);
+  const lines = [];
+  lines.push("=== SUPPLEMENT & MEDICATION PLAN (Plain Text) ===");
+  lines.push("");
+
+  lines.push("Products:");
+  if (!items.length){
+    lines.push("  (none)");
+  } else {
+    for (const p of items){
+      const ing = p.ingredients?.length ? ` | Ingredients: ${p.ingredients.join(", ")}` : "";
+      const cls = p.classHint ? ` | Class: ${p.classHint}` : "";
+      lines.push(`- ${p.name}${p.barcode?` [${p.barcode}]`:""} | Type: ${p.type}${cls}${ing}`);
+    }
   }
 
-  // De-duplicate by title
-  const uniq = (arr, key) => Array.from(new Map(arr.map(o=>[o[key], o])).values());
-  return {interactions: uniq(foundInteractions, "title"), timing: uniq(timing,"title")};
+  lines.push("");
+  lines.push("Per-Product Dosage & Timing (general adult guidance; meds: timing only):");
+  if (!perProd.length){
+    lines.push("  (add ingredients/class for matches)");
+  } else {
+    for (const r of perProd){
+      lines.push(`- ${capitalize(r.key)}: ${r.dosage}; ${r.times}; ${r.timing}${r.withFood?`; With food: ${r.withFood}`:""}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Potential Interactions (rule-based; not comprehensive):");
+  if (!interactions.length){
+    lines.push("- None detected from provided info.");
+  } else {
+    for (const it of interactions){
+      lines.push(`- [${it.severity.toUpperCase()}] ${it.title}: ${it.message}${it.action?` | Action: ${it.action}`:""}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Notes: Educational tool only. Confirm safety, dosing, and timing with your pharmacist/clinician, especially for Rx meds, pregnancy, surgery, or chronic conditions.");
+  return lines.join("\n");
+}
+function updateTextPreview(){ textPreviewEl.textContent = buildTextPlan(products); }
+
+// basic importer from the above plan format (best-effort)
+function parseTextPlan(txt){
+  const lines = txt.split(/\r?\n/);
+  const out = [];
+  for (const ln of lines){
+    if (ln.startsWith("- ")){
+      // try to capture "- Name [barcode] | Type: X | Class: Y | Ingredients: a, b"
+      const m = ln.match(/^- (.+?)(?: \[([0-9A-Za-z]+)\])? \| Type: ([^|]+)(?: \| Class: ([^|]+))?(?: \| Ingredients: (.*))?$/);
+      if (m){
+        const name = m[1].trim();
+        const barcode = (m[2]||"").trim();
+        const type = m[3].trim();
+        const classHint = (m[4]||"").trim();
+        const ingredients = (m[5]||"").split(",").map(s=>s.trim()).filter(Boolean);
+        out.push({ id: barcode || crypto.randomUUID(), barcode, name, type, classHint, ingredients, count:1 });
+      }
+    }
+  }
+  return out;
 }
 
 /* ---------- Storage ---------- */
@@ -693,29 +802,39 @@ function load(){
   try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch{ return []; }
 }
 
-/* ---------- Camera init & device list ---------- */
+/* ---------- Camera init ---------- */
 (async function init(){
   engineNameEl.textContent = ('BarcodeDetector' in window) ? "BarcodeDetector" : "ZXing";
   await listCameras();
 
-  // If we can’t read device labels yet, request a temp stream then re-list
+  // If labels hidden, request temp stream then re-list
   const needLabels = !Array.from(cameraSelect.options).some(o=>o.textContent && o.textContent!=="Camera 1");
   if (needLabels && navigator.mediaDevices?.getUserMedia) {
-    try {
-      const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-      temp.getTracks().forEach(t=>t.stop());
-      await listCameras();
-    } catch(e) { /* ignore */ }
+    try { const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false}); temp.getTracks().forEach(t=>t.stop()); await listCameras(); } catch(e) {}
   }
 })();
 
 /* ---------- Helpers ---------- */
 function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
+function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
+
 </script>
 
 <footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
-  <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety.</div>
-  <div style="margin-top:6px">For best results, host over HTTPS (e.g., GitHub Pages). v1.0</div>
+  <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
+  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.0</div>
 </footer>
 </body>
 </html>
+```
+
+---
+
+### What changed (quick hits)
+
+* **ZXing reliability:** robust multi-CDN loader + “**Force ZXing**” button if native `BarcodeDetector` is flaky. You’ll see loader progress in **Diagnostics**.
+* **Plain-text plan:** buttons to **Copy Plan (Text)** and **Download TXT**; preview shows exactly what will be exported. You can **Import (Text)** later so you don’t have to rescan.
+* **Per-product guidance:** adds typical **dosage ranges** (supplements) and **timing** (supplements + meds). Medications show **timing only** (dosing must follow the prescription).
+* **Interaction matching:** slightly more permissive matching (name tokens + ingredients + class), so entering “magnesium glycinate” or “sertraline” should trigger the appropriate guidance.
+
+If you want me to preload your most-used products (so the app auto-fills per-product rules), tell me the exact names/ingredients and I’ll bake them into the lookup.
