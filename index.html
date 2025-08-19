@@ -7,13 +7,16 @@
 <meta name="theme-color" content="#0ea5e9">
 <style>
   :root{--bg:#0b1220;--panel:#121a2a;--muted:#9fb3c8;--text:#e6f1ff;--accent:#0ea5e9;--danger:#ef4444;--ok:#22c55e;--warn:#f59e0b}
-  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b1220,#0a1020 30%,#0b1220 100%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b1220,#0a1020 30%,#0b1220 100%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
   header{padding:20px 16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid #1f2a44;background:#0b1424;position:sticky;top:0;z-index:10}
-  header h1{margin:0;font-size:18px;font-weight:700} header .tag{font-size:12px;padding:2px 8px;border:1px solid #1f2a44;border-radius:999px;color:var(--muted)}
+  header h1{margin:0;font-size:18px;font-weight:700}
+  header .tag{font-size:12px;padding:2px 8px;border:1px solid #1f2a44;border-radius:999px;color:var(--muted)}
   main{display:grid;gap:16px;padding:16px;max-width:1200px;margin:0 auto}
-  .grid{display:grid;gap:16px} @media(min-width:980px){.grid{grid-template-columns:1.2fr 1fr}}
+  .grid{display:grid;gap:16px}
+  @media(min-width:980px){.grid{grid-template-columns:1.2fr 1fr}}
   .card{background:linear-gradient(180deg,#0d1528,#0c1426);border:1px solid #1f2a44;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-  .card h2{margin:0 0 8px 0;font-size:16px;padding:12px 16px;border-bottom:1px solid #1f2a44;background:#0b1424;border-top-left-radius:16px;border-top-right-radius:16px}
+  .card h2{margin:0 0 8px;font-size:16px;padding:12px 16px;border-bottom:1px solid #1f2a44;background:#0b1424;border-top-left-radius:16px;border-top-right-radius:16px}
   .body{padding:14px 16px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .col{display:flex;flex-direction:column;gap:8px}
@@ -25,18 +28,17 @@
   button.warn{background:linear-gradient(180deg,#f59e0b,#d97706)}
   button.danger{background:linear-gradient(180deg,#ef4444,#dc2626)}
   button.ok{background:linear-gradient(180deg,#22c55e,#16a34a)}
-  .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
+  .muted{color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
   .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #254065;background:#0c1424}
   .list{display:flex;flex-direction:column;gap:10px}
   .item{display:flex;gap:10px;justify-content:space-between;align-items:center;border:1px solid #1f2a44;background:#0b1420;padding:10px;border-radius:10px}
-  .item small{color:var(--muted)}
   video{width:100%;border-radius:12px;border:1px solid #1f2a44;background:#000;max-height:360px}
   .bad{color:var(--danger)} .warnText{color:var(--warn)} .good{color:var(--ok)}
-  .code{white-space:pre-wrap;background:#0a1324;border:1px dashed #26406a;border-radius:10px;padding:10px}
-  .section-title{margin:0 0 6px 0;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
-  .small{font-size:12px} .tiny{font-size:11px}
-  .kbd{font-family:ui-monospace,monospace;font-size:12px;border:1px solid #274066;background:#0b1424;padding:2px 6px;border-radius:6px}
   .pre{white-space:pre; font-family:ui-monospace,monospace; font-size:13px; background:#0a1324; border:1px dashed #274066; border-radius:10px; padding:10px;}
+  .section-title{margin:0 0 6px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+  .tiny{font-size:11px}
+  .kbd{font-family:ui-monospace,monospace;font-size:12px;border:1px solid #274066;background:#0b1424;padding:2px 6px;border-radius:6px}
 </style>
 </head>
 <body>
@@ -61,7 +63,7 @@
               <button id="startBtn">Start Camera</button>
               <button class="ghost" id="stopBtn">Stop</button>
               <button class="ghost" id="forceZXingBtn" title="Force ZXing fallback">Force ZXing</button>
-              <span id="engineTag" class="pill"><span>Engine:</span><strong id="engineName" class="mono">…</strong></span>
+              <span id="engineTag" class="pill"><span>Engine:&nbsp;</span><strong id="engineName" class="mono">…</strong></span>
             </div>
           </div>
 
@@ -117,7 +119,7 @@
 
           <div style="margin-top:10px">
             <div class="section-title">Last scanned code</div>
-            <div id="lastCode" class="code mono tiny muted">—</div>
+            <div id="lastCode" class="pre tiny">—</div>
           </div>
         </div>
       </section>
@@ -176,20 +178,15 @@
     </section>
   </main>
 
-<!-- Keep as module, but use ONLY broadly-supported syntax inside -->
 <script type="module">
-/* ---------- Utilities ---------- */
+/* ---------------- Utilities ---------------- */
 const $ = s => document.querySelector(s);
-const log = (...a)=>{ const el=$("#diag"); const line=document.createElement("div"); line.textContent=a.join(" "); el.prepend(line); };
+const log = (...a)=>{ const el=$("#diag"); if(!el) return; const line=document.createElement("div"); line.textContent=a.join(" "); el.prepend(line); };
 function uuid(){ try{ return crypto.randomUUID(); }catch{ return "id-"+Math.random().toString(36).slice(2); } }
-function esc(s){
-  return String(s).replace(/[&<>"']/g, c=>{
-    switch(c){ case "&":return "&amp;"; case "<":return "&lt;"; case ">":return "&gt;"; case '"':return "&quot;"; case "'":return "&#39;"; default:return c; }
-  });
-}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
 
-/* ---------- Elements ---------- */
+/* ---------------- Elements ---------------- */
 const engineNameEl = $("#engineName");
 const lastCodeEl = $("#lastCode");
 const productListEl = $("#productList");
@@ -199,7 +196,7 @@ const textPreviewEl = $("#textPreview");
 const videoEl = $("#preview");
 const cameraSelect = $("#cameraSelect");
 
-/* ---------- State ---------- */
+/* ---------------- State ---------------- */
 const LS_KEY = "scannedProducts_v3_textplan_compat";
 let products = load();
 let stream = null;
@@ -208,13 +205,13 @@ let forceZXing = false;
 let zxingReader = null;
 let seenCodes = new Map();
 
-/* ---------- Storage ---------- */
+/* ---------------- Storage ---------------- */
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(products)); }catch(e){} }
 function load(){
   try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch{ return []; }
 }
 
-/* ---------- Diagnostics ---------- */
+/* ---------------- Diagnostics ---------------- */
 function selfTest(){
   const secure = (window.isSecureContext===true);
   log("Secure Context:", secure ? "yes" : "no (camera requires HTTPS)");
@@ -223,19 +220,20 @@ function selfTest(){
   log("BarcodeDetector:", ("BarcodeDetector" in window) ? "available" : "not available");
 }
 
-/* ---------- Camera ---------- */
+/* ---------------- Camera ---------------- */
 async function listCameras(){
   cameraSelect.innerHTML = "";
   try{
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter(d => d.kind==="videoinput");
     if (!cams.length){ cameraSelect.innerHTML = `<option>No cameras found</option>`; return; }
-    cams.forEach((d,i)=>{
+    for (let i=0;i<cams.length;i++){
+      const d=cams[i];
       const opt=document.createElement("option");
       opt.value=d.deviceId;
-      opt.textContent=d.label || `Camera ${i+1}`;
+      opt.textContent=d.label || ("Camera "+(i+1));
       cameraSelect.appendChild(opt);
-    });
+    }
     log("Video inputs:", cams.length);
   }catch(e){ log("enumerateDevices error:", e.message); }
 }
@@ -243,7 +241,7 @@ async function listCameras(){
 async function startCamera(){
   stopCamera();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    alert("This browser doesn’t support camera access here. Try Chrome/Edge, and ensure HTTPS.");
+    alert("This browser doesn’t support camera access here. Try Chrome/Edge on HTTPS.");
     return;
   }
   scanning = true;
@@ -272,17 +270,25 @@ async function startCamera(){
 
 function stopCamera(){
   scanning=false;
-  if (zxingReader && zxingReader.stopContinuousDecode){
-    try{ zxingReader.stopContinuousDecode(); }catch(e){}
+
+  if (zxingReader){
+    try{ if (zxingReader.stopContinuousDecode) zxingReader.stopContinuousDecode(); }catch(e){}
+    try{ if (zxingReader.reset) zxingReader.reset(); }catch(e){}
+    try{ if (zxingReader.stopStreams) zxingReader.stopStreams(); }catch(e){}
+    zxingReader = null;
   }
-  if (videoEl){ try{ videoEl.pause(); videoEl.srcObject=null; }catch(e){} }
+
+  if (videoEl){
+    try{ videoEl.pause(); videoEl.srcObject = null; }catch(e){}
+  }
   if (stream){
     try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){}
-    stream=null;
+    stream = null;
   }
   log("Camera stopped.");
 }
 
+/* Native BarcodeDetector loop */
 async function nativeLoop(){
   const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','itf','code_39','qr_code']});
   const canvas = document.createElement('canvas');
@@ -297,50 +303,82 @@ async function nativeLoop(){
         ctx.drawImage(videoEl, 0,0,w,h);
         const codes = await detector.detect(canvas);
         if (codes && codes.length){
-          for (const c of codes){ handleCode(String(c.rawValue || c)); }
+          for (let i=0;i<codes.length;i++){
+            const c = codes[i];
+            handleCode(String(c.rawValue || c));
+          }
         }
       }
-    }catch(e){ /* ignore transient errors */ }
+    }catch(e){ /* ignore transient */ }
     requestAnimationFrame(tick);
   };
   tick();
 }
 
-/* ZXing loader (multi-CDN) */
+/* ZXing loader (normalize exports; no hints) */
 async function loadZXing(){
   const urls = [
     'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm',
     'https://unpkg.com/@zxing/browser@0.1.5/esm/index.js',
     'https://cdn.skypack.dev/@zxing/browser@0.1.5'
   ];
-  for (const u of urls){
+  for (let i=0;i<urls.length;i++){
+    const u = urls[i];
     try{
       log("Loading ZXing:", u);
-      const mod = await import(u);
-      log("ZXing loaded:", u);
-      return mod;
-    }catch(e){ log("ZXing load failed:", e.message); }
+      const mod = await import(/* @vite-ignore */ u);
+      // Normalize export shapes (some CDNs use default export)
+      const ZX = Object.assign({}, mod, (mod && typeof mod==='object' && mod.default ? mod.default : {}));
+      log("ZXing exports:", Object.keys(ZX).join(", "));
+      return ZX;
+    }catch(e){ log("ZXing load failed:", e && e.message ? e.message : String(e)); }
   }
   throw new Error("All ZXing CDNs failed");
 }
 
 async function startZXing(){
   try{
-    const mod = await loadZXing();
-    const {BrowserMultiFormatContinuousReader, DecodeHintType, BarcodeFormat} = mod;
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.ITF
-    ]);
-    zxingReader = new BrowserMultiFormatContinuousReader(hints, {delayBetweenScanAttempts: 60, delayBetweenScanSuccess: 300});
-    await zxingReader.decodeFromVideoDevice(cameraSelect.value || null, videoEl, (result, err)=>{
-      if (result){ handleCode(String(result.getText())); }
+    const ZX = await loadZXing();
+
+    const ReaderClass =
+      ZX.BrowserMultiFormatContinuousReader ||
+      ZX.BrowserMultiFormatReader;
+
+    if (!ReaderClass) {
+      throw new Error("ZXing reader class not found");
+    }
+
+    // Create reader WITHOUT hints (avoids DecodeHintType issues)
+    zxingReader = new ReaderClass(undefined, {
+      delayBetweenScanAttempts: 60,
+      delayBetweenScanSuccess: 300
     });
+
+    const deviceId = cameraSelect.value || null;
+
+    const decode = zxingReader.decodeFromVideoDevice
+      ? function(d, el, cb){ return zxingReader.decodeFromVideoDevice(d, el, cb); }
+      : zxingReader.decodeFromConstraints
+      ? function(d, el, cb){
+          const constraints = { video: d ? { deviceId: { exact: d } } : { facingMode: { ideal: 'environment' } } };
+          return zxingReader.decodeFromConstraints(constraints, el, cb);
+        }
+      : null;
+
+    if (!decode) throw new Error("No decode method available in ZXing reader");
+
+    await decode(deviceId, videoEl, function(result, err){
+      if (result){
+        try{ handleCode(String(result.getText())); }catch(e){}
+      }
+      // transient errors ignored
+    });
+
     log("ZXing reader running.");
-  }catch(e){
+  } catch(e){
     engineNameEl.textContent = "ZXing (load failed)";
-    log("Failed to start ZXing:", e.message);
-    alert("ZXing fallback failed to load. You can still add items manually.");
+    log("Failed to start ZXing:", e && e.message ? e.message : String(e));
+    alert("ZXing fallback failed to run. You can still add items manually.");
   }
 }
 
@@ -364,7 +402,7 @@ function handleCode(code){
   $("#typeInput").value = "unknown";
 }
 
-/* ---------- Add / Edit / Remove ---------- */
+/* ---------------- Add / Edit / Remove ---------------- */
 function addOrUpdate(){
   const barcode = ($("#barcodeInput").value || "").trim();
   const name = ($("#nameInput").value || "").trim();
@@ -381,11 +419,13 @@ function addOrUpdate(){
     id: barcode || uuid(),
     barcode: barcode || "",
     name: name || (barcode ? ("Product " + barcode) : "Unnamed product"),
-    type, classHint, ingredients,
+    type: type,
+    classHint: classHint,
+    ingredients: ingredients,
     count: (existingIdx>=0 ? (products[existingIdx].count||1) : 1)
   };
 
-  if (existingIdx>=0) products[existingIdx] = {...products[existingIdx], ...product};
+  if (existingIdx>=0) products[existingIdx] = Object.assign({}, products[existingIdx], product);
   else products.unshift(product);
 
   save(); renderList(); updateTextPreview();
@@ -400,10 +440,11 @@ function clearForm(){
 function renderList(){
   productListEl.innerHTML="";
   if (!products.length){
-    productListEl.innerHTML = `<div class="muted tiny">No products yet. Scan or add manually.</div>`;
+    productListEl.innerHTML = `<div class="tiny muted">No products yet. Scan or add manually.</div>`;
     return;
   }
-  for (const p of products){
+  for (let i=0;i<products.length;i++){
+    const p = products[i];
     const div = document.createElement("div"); div.className="item";
     const left = document.createElement("div");
     const ing = (p.ingredients && p.ingredients.length) ? `<div class="tiny muted">Ingredients: ${esc(p.ingredients.join(", "))}</div>` : "";
@@ -414,7 +455,7 @@ function renderList(){
     `;
     const right = document.createElement("div"); right.className="row";
     const editBtn = document.createElement("button"); editBtn.className="ghost"; editBtn.textContent="Edit";
-    editBtn.onclick = ()=>{
+    editBtn.onclick = function(){
       $("#barcodeInput").value = p.barcode;
       $("#nameInput").value = p.name;
       $("#typeInput").value = p.type;
@@ -423,47 +464,53 @@ function renderList(){
       window.scrollTo({top:0,behavior:"smooth"});
     };
     const delBtn = document.createElement("button"); delBtn.className="danger"; delBtn.textContent="Remove";
-    delBtn.onclick = ()=>{
-      if (confirm(`Remove "${p.name}"?`)){
+    delBtn.onclick = function(){
+      if (confirm('Remove "'+p.name+'"?')){
         products = products.filter(x=>x!==p);
         save(); renderList(); updateTextPreview();
       }
     };
-    right.append(editBtn, delBtn);
-    div.append(left, right);
-    productListEl.append(div);
+    right.appendChild(editBtn); right.appendChild(delBtn);
+    div.appendChild(left); div.appendChild(right);
+    productListEl.appendChild(div);
   }
 }
 
-/* ---------- Text Plan (copy/import) ---------- */
+/* ---------------- Text Plan (copy/import) ---------------- */
 function buildTextPlan(items){
-  const {interactions, perProd} = analyze(items);
+  const result = analyze(items);
+  const interactions = result.interactions;
+  const perProd = result.perProd;
+
   const lines = [];
   lines.push("=== SUPPLEMENT & MEDICATION PLAN (Plain Text) ===");
   lines.push("");
   lines.push("Products:");
   if (!items.length){ lines.push("  (none)"); }
   else{
-    for (const p of items){
-      const ing = (p.ingredients && p.ingredients.length) ? ` | Ingredients: ${p.ingredients.join(", ")}` : "";
-      const cls = p.classHint ? ` | Class: ${p.classHint}` : "";
-      lines.push(`- ${p.name}${p.barcode?` [${p.barcode}]`:""} | Type: ${p.type}${cls}${ing}`);
+    for (let i=0;i<items.length;i++){
+      const p = items[i];
+      const ing = (p.ingredients && p.ingredients.length) ? (" | Ingredients: "+p.ingredients.join(", ")) : "";
+      const cls = p.classHint ? (" | Class: "+p.classHint) : "";
+      lines.push("- "+p.name+(p.barcode?(" ["+p.barcode+"]"):"")+" | Type: "+p.type+cls+ing);
     }
   }
   lines.push("");
   lines.push("Per-Product Dosage & Timing (general adult guidance; meds: timing only):");
   if (!perProd.length){ lines.push("  (add ingredients/class for matches)"); }
   else{
-    for (const r of perProd){
-      lines.push(`- ${capitalize(r.key)}: ${r.dosage}; ${r.times}; ${r.timing}${r.withFood?`; With food: ${r.withFood}`:""}`);
+    for (let i=0;i<perProd.length;i++){
+      const r = perProd[i];
+      lines.push("- "+capitalize(r.key)+": "+r.dosage+"; "+r.times+"; "+r.timing+(r.withFood?"; With food: "+r.withFood:""));
     }
   }
   lines.push("");
   lines.push("Potential Interactions (rule-based; not comprehensive):");
   if (!interactions.length){ lines.push("- None detected from provided info."); }
   else{
-    for (const it of interactions){
-      lines.push(`- [${it.severity.toUpperCase()}] ${it.title}: ${it.message}${it.action?` | Action: ${it.action}`:""}`);
+    for (let i=0;i<interactions.length;i++){
+      const it = interactions[i];
+      lines.push("- ["+it.severity.toUpperCase()+"] "+it.title+": "+it.message+(it.action?(" | Action: "+it.action):""));
     }
   }
   lines.push("");
@@ -473,24 +520,25 @@ function buildTextPlan(items){
 function updateTextPreview(){ textPreviewEl.textContent = buildTextPlan(products); }
 function parseTextPlan(txt){
   const lines = txt.split(/\r?\n/), out=[];
-  for (const ln of lines){
-    if (ln.startsWith("- ")){
+  for (let i=0;i<lines.length;i++){
+    const ln = lines[i];
+    if (ln.indexOf("- ")===0){
       const m = ln.match(/^- (.+?)(?: \[([0-9A-Za-z]+)\])? \| Type: ([^|]+)(?: \| Class: ([^|]+))?(?: \| Ingredients: (.*))?$/);
       if (m){
         const name = m[1].trim();
         const barcode = (m[2]||"").trim();
         const type = m[3].trim();
         const classHint = (m[4]||"").trim();
-        const ingredients = (m[5]||"").split(",").map(s=>s.trim()).filter(Boolean);
-        out.push({ id: barcode || uuid(), barcode, name, type, classHint, ingredients, count:1 });
+        const ingredients = (m[5]||"").split(",").map(function(s){return s.trim();}).filter(function(x){return !!x;});
+        out.push({ id: barcode || uuid(), barcode: barcode, name: name, type: type, classHint: classHint, ingredients: ingredients, count:1 });
       }
     }
   }
   return out;
 }
 
-/* ---------- Interactions / Timing Knowledge ---------- */
-const KNOW = (()=>{
+/* ---------------- Knowledge base ---------------- */
+const KNOW = (function(){
 
   const synonyms = new Map(Object.entries({
     "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
@@ -524,89 +572,71 @@ const KNOW = (()=>{
     "statin": ["atorvastatin","simvastatin","lovastatin","rosuvastatin","pravastatin","pitavastatin"],
     "ace/arb": ["lisinopril","enalapril","ramipril","benazepril","losartan","valsartan","olmesartan","candesartan"],
     "diuretic": ["furosemide","torsemide","bumetanide","hydrochlorothiazide","chlorthalidone"],
-    "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"],
+    "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"]
   }));
 
   function canonize(s){
     s = String(s||"").toLowerCase().trim();
-    for (const [canon, alts] of synonyms){
+    const it = synonyms.entries();
+    for (let kv = it.next(); !kv.done; kv = it.next()){
+      const canon = kv.value[0], alts = kv.value[1];
       if (s===canon) return canon;
-      for (const a of alts){ if (a===s) return canon; }
+      for (let j=0;j<alts.length;j++){ if (alts[j]===s) return canon; }
     }
     return s;
   }
 
   const checks = [
-    ({has})=>{
-      if (has("warfarin") && has("vitamin k")){
-        return {severity:"moderate", title:"Warfarin + Vitamin K",
-          message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
-          action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
-        return {severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
-          message:"May increase bleeding tendency.",
-          action:"Monitor for bleeding/bruising; discuss with clinician."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])){
-        return {severity:"high", title:"Serotonergic Combination",
-          message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise risk of serotonin syndrome.",
-          action:"Avoid combining or use only under medical supervision."};
-      }
-    },
-    ({has})=>{
-      if (has("st johns wort")){
-        return {severity:"moderate", title:"St John’s Wort – Enzyme Induction",
-          message:"Can reduce levels of many medications via CYP3A4 induction.",
-          action:"Review all meds with a pharmacist if using St John’s Wort."};
-      }
-    },
-    ({hasAny, has})=>{
-      if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) {
-        return {severity:"moderate", title:"Thyroid + Minerals",
-          message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
-          action:"Separate by at least 4 hours."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) {
-        return {severity:"moderate", title:"Antibiotic + Minerals",
-          message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
-          action:"Separate by 2–4 hours (follow label)."};
-      }
-    },
-    ({has})=>{
-      if (has("statin") && has("grapefruit")) {
-        return {severity:"moderate", title:"Statin + Grapefruit",
-          message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
-          action:"Avoid grapefruit unless your statin is known to be unaffected."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) {
-        return {severity:"moderate", title:"ACE/ARB + Potassium",
-          message:"May increase potassium levels.",
-          action:"Avoid extra potassium unless prescribed; monitor if directed."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) {
-        return {severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
-          message:"Potential additive bleeding risk.",
-          action:"Use cautiously; discuss with clinician."};
-      }
-    },
-    ({hasAny})=>{
-      if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
-        return {severity:"low", title:"Berberine + Glucose-Lowering Meds",
-          message:"May enhance glucose-lowering effects.",
-          action:"Monitor glucose and discuss adjustments with clinician."};
-      }
-    }
+    function({has}){ if (has("warfarin") && has("vitamin k")) return {
+      severity:"moderate", title:"Warfarin + Vitamin K",
+      message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
+      action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."
+    }; },
+    function({hasAny}){ if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) return {
+      severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
+      message:"May increase bleeding tendency.",
+      action:"Monitor for bleeding/bruising; discuss with clinician."
+    }; },
+    function({hasAny}){ if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])) return {
+      severity:"high", title:"Serotonergic Combination",
+      message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise risk of serotonin syndrome.",
+      action:"Avoid combining or use only under medical supervision."
+    }; },
+    function({has}){ if (has("st johns wort")) return {
+      severity:"moderate", title:"St John’s Wort – Enzyme Induction",
+      message:"Can reduce levels of many medications via CYP3A4 induction.",
+      action:"Review all meds with a pharmacist if using St John’s Wort."
+    }; },
+    function({hasAny,has}){ if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) return {
+      severity:"moderate", title:"Thyroid + Minerals",
+      message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
+      action:"Separate by at least 4 hours."
+    }; },
+    function({hasAny}){ if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) return {
+      severity:"moderate", title:"Antibiotic + Minerals",
+      message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
+      action:"Separate by 2–4 hours (follow label)."
+    }; },
+    function({has}){ if (has("statin") && has("grapefruit")) return {
+      severity:"moderate", title:"Statin + Grapefruit",
+      message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
+      action:"Avoid grapefruit unless your statin is known to be unaffected."
+    }; },
+    function({hasAny}){ if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) return {
+      severity:"moderate", title:"ACE/ARB + Potassium",
+      message:"May increase potassium levels.",
+      action:"Avoid extra potassium unless prescribed; monitor if directed."
+    }; },
+    function({hasAny}){ if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) return {
+      severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
+      message:"Potential additive bleeding risk.",
+      action:"Use cautiously; discuss with clinician."
+    }; },
+    function({hasAny}){ if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) return {
+      severity:"low", title:"Berberine + Glucose-Lowering Meds",
+      message:"May enhance glucose-lowering effects.",
+      action:"Monitor glucose and discuss adjustments with clinician."
+    }; }
   ];
 
   const perProduct = [
@@ -631,49 +661,68 @@ const KNOW = (()=>{
   ];
 
   function perProductAdvice(has){
-    const out=[]; for (const rec of perProduct){ if (has(rec.key)) out.push(rec); } return out;
+    const out=[]; for (let i=0;i<perProduct.length;i++){ const rec=perProduct[i]; if (has(rec.key)) out.push(rec); } return out;
   }
 
-  return {canonize, checks, perProductAdvice};
+  return { canonize, checks, perProductAdvice };
+
+  function canonize(s){
+    s = String(s||"").toLowerCase().trim();
+    const it = synonyms.entries();
+    for (let kv = it.next(); !kv.done; kv = it.next()){
+      const canon = kv.value[0], alts = kv.value[1];
+      if (s===canon) return canon;
+      for (let j=0;j<alts.length;j++){ if (alts[j]===s) return canon; }
+    }
+    return s;
+  }
 })();
 
 function analyze(items){
   const bag = new Set();
-  for (const p of items){
+  for (let i=0;i<items.length;i++){
+    const p = items[i];
     const fields = [].concat(p.ingredients||[], p.classHint? [p.classHint]:[], p.name||"");
-    for (const raw of fields){
-      const parts = String(raw).split(/[+,/()\-]| and | with | & |;|:|\s+/i).map(s=>s.trim()).filter(Boolean);
-      for (const part of parts){ bag.add(KNOW.canonize(part)); }
+    for (let k=0;k<fields.length;k++){
+      const raw = fields[k];
+      const parts = String(raw).split(/[+,/()\-]| and | with | & |;|:|\s+/i).map(function(s){return s.trim();}).filter(function(x){return !!x;});
+      for (let j=0;j<parts.length;j++){ bag.add(KNOW.canonize(parts[j])); }
     }
   }
-  const has = (canon)=>{
+  function has(canon){
     if (bag.has(canon)) return true;
-    for (const t of bag){ if (t.indexOf(canon)>-1) return true; }
+    const it = bag.values();
+    for (let v = it.next(); !v.done; v = it.next()){ if (String(v.value).indexOf(canon)>-1) return true; }
     return false;
-  };
-  const hasAny = arr => arr.some(x=>has(x));
+  }
+  function hasAny(arr){ for (let i=0;i<arr.length;i++){ if (has(arr[i])) return true; } return false; }
+
   const foundInteractions = [];
-  for (const fn of KNOW.checks){ const r=fn({has,hasAny}); if (r) foundInteractions.push(r); }
-  const uniq = (arr, key) => Array.from(new Map(arr.map(o=>[o[key], o])).values());
+  for (let i=0;i<KNOW.checks.length;i++){ const r = KNOW.checks[i]({has:has,hasAny:hasAny}); if (r) foundInteractions.push(r); }
+  const uniq = function(arr, key){ return Array.from(new Map(arr.map(function(o){ return [o[key], o]; })).values()); };
   const perProd = KNOW.perProductAdvice(has);
-  return {interactions: uniq(foundInteractions,"title"), perProd};
+
+  return {interactions: uniq(foundInteractions,"title"), perProd: perProd};
 }
 
-/* ---------- Render Analysis ---------- */
+/* ---------------- Render Analysis ---------------- */
 function renderAnalysis(){
-  const {interactions, perProd} = analyze(products);
+  const result = analyze(products);
+  const interactions = result.interactions;
+  const perProd = result.perProd;
 
   interactionsEl.innerHTML = "";
   if (!interactions.length){
     interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected from available info. Not a guarantee of safety—verify with a pharmacist.</div>`;
   } else {
     const ul = document.createElement("ul"); ul.style.margin="0"; ul.style.paddingLeft="18px";
-    for (const item of interactions){
+    for (let i=0;i<interactions.length;i++){
+      const item = interactions[i];
       const li = document.createElement("li");
       li.innerHTML = `<span class="${item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':'')}"><strong>${esc(item.title)}</strong></span> — ${esc(item.message)} ${item.action?`<em>Action:</em> ${esc(item.action)}`:""}`;
-      ul.append(li);
+      ul.appendChild(li);
     }
-    interactionsEl.append(ul);
+    interactionsEl.appendChild(ul);
   }
 
   timingUIEl.innerHTML="";
@@ -681,81 +730,87 @@ function renderAnalysis(){
     timingUIEl.innerHTML = `<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>`;
   } else {
     const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="18px";
-    for (const r of perProd){
+    for (let i=0;i<perProd.length;i++){
+      const r = perProd[i];
       const li = document.createElement("li");
       li.innerHTML = `<strong>${esc(capitalize(r.key))}</strong> — <em>${esc(r.dosage)}</em>; ${esc(r.times)}; ${esc(r.timing)} ${r.withFood?`• With food: ${esc(r.withFood)}`:""}`;
-      ul2.append(li);
+      ul2.appendChild(li);
     }
-    timingUIEl.append(ul2);
+    timingUIEl.appendChild(ul2);
   }
 
   updateTextPreview();
 }
 
-/* ---------- Event Listeners ---------- */
+/* ---------------- Event Listeners ---------------- */
 document.getElementById("startBtn").addEventListener("click", startCamera);
 document.getElementById("stopBtn").addEventListener("click", stopCamera);
-document.getElementById("forceZXingBtn").addEventListener("click", ()=>{ forceZXing=true; if (scanning) startCamera(); });
+document.getElementById("forceZXingBtn").addEventListener("click", function(){
+  forceZXing=true;
+  if (scanning) startCamera();
+});
 
 document.getElementById("addBtn").addEventListener("click", addOrUpdate);
 document.getElementById("clearFormBtn").addEventListener("click", clearForm);
 
 document.getElementById("analyzeBtn").addEventListener("click", renderAnalysis);
 
-document.getElementById("copyTextBtn").addEventListener("click", async ()=>{
+document.getElementById("copyTextBtn").addEventListener("click", async function(){
   await navigator.clipboard.writeText(buildTextPlan(products));
   alert("Copied the plain-text plan to clipboard.");
 });
-document.getElementById("downloadTextBtn").addEventListener("click", ()=>{
+document.getElementById("downloadTextBtn").addEventListener("click", function(){
   const blob = new Blob([buildTextPlan(products)], {type:"text/plain"});
   const url = URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download="supplement-med-plan.txt"; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
 });
-document.getElementById("importBtn").addEventListener("click", ()=>{
+document.getElementById("importBtn").addEventListener("click", function(){
   const txt = prompt("Paste a plain-text plan created by this app. (Existing entries will be merged.)");
   if (!txt) return;
   try{
     const parsed = parseTextPlan(txt);
-    const key = p => (p.barcode && p.barcode.trim()) || p.name.toLowerCase();
-    const map = new Map(products.map(p=>[key(p),p]));
-    for (const p of parsed){ const k=key(p); map.set(k, {...(map.get(k)||{}), ...p}); }
+    const key = function(p){ return (p.barcode && p.barcode.trim()) || p.name.toLowerCase(); };
+    const map = new Map(products.map(function(p){ return [key(p),p]; }));
+    for (let i=0;i<parsed.length;i++){
+      const p = parsed[i]; const k = key(p);
+      map.set(k, Object.assign({}, map.get(k)||{}, p));
+    }
     products = Array.from(map.values());
     save(); renderList(); updateTextPreview();
     alert("Imported.");
-  }catch(e){ alert("Import failed: " + e.message); }
+  }catch(e){ alert("Import failed: " + (e && e.message ? e.message : String(e))); }
 });
-document.getElementById("resetBtn").addEventListener("click", ()=>{
+document.getElementById("resetBtn").addEventListener("click", function(){
   if (!confirm("Clear saved products?")) return;
   products = []; save(); renderList(); updateTextPreview();
 });
 
-/* ---------- Init ---------- */
+/* ---------------- Init ---------------- */
 (async function init(){
   selfTest();
   engineNameEl.textContent = ('BarcodeDetector' in window && !forceZXing) ? "BarcodeDetector" : "ZXing";
   renderList(); updateTextPreview();
   try{
     await listCameras();
-
-    // If device labels are hidden until permission is granted, briefly request then release
+    // If labels hidden until permission is granted, briefly request then release
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-      const needLabels = !Array.from(cameraSelect.options).some(o=>o.textContent && o.textContent!=="Camera 1");
+      const needLabels = !Array.from(cameraSelect.options).some(function(o){return o.textContent && o.textContent!=="Camera 1";});
       if (needLabels){
         try{
           const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-          temp.getTracks().forEach(t=>t.stop());
+          temp.getTracks().forEach(function(t){t.stop();});
           await listCameras();
         }catch(e){}
       }
     }
-  }catch(e){ log("Init error:", e.message); }
+  }catch(e){ log("Init error:", e && e.message ? e.message : String(e)); }
 })();
 </script>
 
 <footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
   <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
-  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.3 (compat)</div>
+  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.4 (ZXing export fix)</div>
 </footer>
 </body>
 </html>
