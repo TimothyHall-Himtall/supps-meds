@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Supplement & Medication Scanner – Interactions & Timing</title>
+<meta name="theme-color" content="#0ea5e9">
+<style>
+  :root{--bg:#0b1220;--panel:#121a2a;--muted:#9fb3c8;--text:#e6f1ff;--accent:#0ea5e9;--danger:#ef4444;--ok:#22c55e;--warn:#f59e0b}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b1220,#0a1020 30%,#0b1220 100%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  header{padding:20px 16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid #1f2a44;background:#0b1424;position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:18px;font-weight:700} header .tag{font-size:12px;padding:2px 8px;border:1px solid #1f2a44;border-radius:999px;color:var(--muted)}
+  main{display:grid;gap:16px;padding:16px;max-width:1200px;margin:0 auto}
+  .grid{display:grid;gap:16px} @media(min-width:980px){.grid{grid-template-columns:1.2fr 1fr}}
+  .card{background:linear-gradient(180deg,#0d1528,#0c1426);border:1px solid #1f2a44;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 8px 0;font-size:16px;padding:12px 16px;border-bottom:1px solid #1f2a44;background:#0b1424;border-top-left-radius:16px;border-top-right-radius:16px}
+  .body{padding:14px 16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .col{display:flex;flex-direction:column;gap:8px}
+  label{font-size:13px;color:var(--muted)}
+  input,select,textarea,button{border-radius:10px;border:1px solid #233252;background:#0c1527;color:var(--text);padding:10px 12px;font-size:14px}
+  textarea{min-height:64px;resize:vertical}
+  button{cursor:pointer;background:linear-gradient(180deg,#0ea5e9,#0284c7);border:0;font-weight:600}
+  button.ghost{background:transparent;border:1px solid #254065}
+  button.warn{background:linear-gradient(180deg,#f59e0b,#d97706)}
+  button.danger{background:linear-gradient(180deg,#ef4444,#dc2626)}
+  button.ok{background:linear-gradient(180deg,#22c55e,#16a34a)}
+  .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #254065;background:#0c1424}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .item{display:flex;gap:10px;justify-content:space-between;align-items:center;border:1px solid #1f2a44;background:#0b1420;padding:10px;border-radius:10px}
+  .item small{color:var(--muted)}
+  video{width:100%;border-radius:12px;border:1px solid #1f2a44;background:#000;max-height:360px}
+  .bad{color:var(--danger)} .warnText{color:var(--warn)} .good{color:var(--ok)}
+  .code{white-space:pre-wrap;background:#0a1324;border:1px dashed #26406a;border-radius:10px;padding:10px}
+  .section-title{margin:0 0 6px 0;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+  .small{font-size:12px} .tiny{font-size:11px}
+  .kbd{font-family:ui-monospace,monospace;font-size:12px;border:1px solid #274066;background:#0b1424;padding:2px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Supplement & Medication Scanner</h1>
+    <span class="tag">barcode → interactions + timing</span>
+    <span class="tag">works in Safari / Chrome / Edge</span>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- LEFT: Scanner + Add Product -->
+      <section class="card">
+        <h2>Scan</h2>
+        <div class="body">
+          <div class="row">
+            <div class="col" style="min-width:200px;flex:1">
+              <label for="cameraSelect">Camera</label>
+              <select id="cameraSelect" title="Select camera"></select>
+            </div>
+            <div class="row" style="align-self:end">
+              <button id="startBtn">Start Camera</button>
+              <button class="ghost" id="stopBtn">Stop</button>
+              <span id="engineTag" class="pill"><span>Engine:</span><strong id="engineName" class="mono">…</strong></span>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <video id="preview" playsinline muted></video>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <span class="tiny muted">Tip: Needs <span class="kbd">https</span> and camera permission. iOS may only show the rear camera by default.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Add Product (Manual or after Scan)</h2>
+        <div class="body">
+          <div class="row">
+            <div class="col" style="flex:1;min-width:200px">
+              <label>Barcode / Code</label>
+              <input id="barcodeInput" placeholder="e.g., 041570123456" class="mono" />
+            </div>
+            <div class="col" style="flex:1;min-width:200px">
+              <label>Product Name</label>
+              <input id="nameInput" placeholder="e.g., Brand X Magnesium Glycinate 200mg" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:8px">
+            <div class="col" style="flex:1;min-width:200px">
+              <label>Type</label>
+              <select id="typeInput">
+                <option value="supplement">Supplement</option>
+                <option value="medication">Medication (Rx/OTC)</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+            <div class="col" style="flex:1;min-width:200px">
+              <label>Class (optional, meds)</label>
+              <input id="classInput" placeholder="e.g., SSRI, statin, PPI, thyroid…" />
+            </div>
+          </div>
+
+          <div class="col" style="margin-top:8px">
+            <label>Ingredients (comma-separated)</label>
+            <textarea id="ingredientsInput" placeholder="e.g., magnesium glycinate, magnesium, vitamin D3, fish oil, curcumin"></textarea>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <button id="addBtn" class="ok">Add / Update Product</button>
+            <button id="clearFormBtn" class="ghost">Clear form</button>
+          </div>
+
+          <div style="margin-top:10px">
+            <div class="section-title">Last scanned code</div>
+            <div id="lastCode" class="code mono tiny muted">—</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Product List & Export -->
+    <section class="card">
+      <h2>Your Scanned / Entered Products</h2>
+      <div class="body">
+        <div class="row" style="justify-content:space-between">
+          <div class="row" style="gap:8px">
+            <button id="copyListBtn">Copy List (JSON)</button>
+            <button id="exportFileBtn" class="ghost">Download JSON</button>
+            <button id="importBtn" class="ghost">Import from JSON</button>
+            <button id="resetBtn" class="danger">Reset List</button>
+          </div>
+          <div><span class="tiny muted">Auto-saved to your browser (localStorage)</span></div>
+        </div>
+
+        <div id="productList" class="list" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- Analysis -->
+    <section class="card">
+      <h2>Interactions & Timing Analysis</h2>
+      <div class="body">
+        <div class="row">
+          <button id="analyzeBtn">Analyze Now</button>
+          <span class="tiny muted">Educational information. Not a substitute for professional advice. Consult your pharmacist/clinician.</span>
+        </div>
+
+        <div style="margin-top:14px">
+          <div class="section-title">Potential Interactions</div>
+          <div id="interactions"></div>
+        </div>
+
+        <div style="margin-top:14px">
+          <div class="section-title">Timing & With-Food Recommendations</div>
+          <div id="timing"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Log / Debug -->
+    <section class="card">
+      <h2>Diagnostics</h2>
+      <div class="body">
+        <div id="diag" class="tiny muted"></div>
+      </div>
+    </section>
+  </main>
+
+<script type="module">
+/* ---------- Utilities ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const log = (...a)=>{ const el=$("#diag"); const line=document.createElement("div"); line.textContent=a.join(" "); el.prepend(line); };
+
+const engineNameEl = $("#engineName");
+const lastCodeEl = $("#lastCode");
+const productListEl = $("#productList");
+const interactionsEl = $("#interactions");
+const timingEl = $("#timing");
+const LS_KEY = "scannedProducts_v2";
+
+let products = load();
+renderList();
+
+/* ---------- Camera & Scanning ---------- */
+const videoEl = $("#preview");
+const cameraSelect = $("#cameraSelect");
+const startBtn = $("#startBtn");
+const stopBtn = $("#stopBtn");
+
+let stream = null;
+let scanning = false;
+let usingNative = false;
+let zxingReader = null;
+let seenCodes = new Map(); // code -> timestamp to de-dup
+
+async function listCameras(){
+  cameraSelect.innerHTML = "";
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind==="videoinput");
+    if (!cams.length) {
+      cameraSelect.innerHTML = `<option>No cameras found</option>`;
+      return;
+    }
+    cams.forEach((d,i)=>{
+      const opt=document.createElement("option");
+      opt.value=d.deviceId;
+      opt.textContent=d.label || `Camera ${i+1}`;
+      cameraSelect.appendChild(opt);
+    });
+  } catch(e){
+    log("enumerateDevices error:", e.message);
+  }
+}
+
+async function startCamera(){
+  stopCamera();
+  scanning = true;
+
+  const deviceId = cameraSelect.value || undefined;
+  const constraints = {
+    audio:false,
+    video: deviceId ? {deviceId: {exact: deviceId}} :
+                      {facingMode: {ideal: "environment"}}
+  };
+
+  try{
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoEl.srcObject = stream;
+    await videoEl.play();
+    log("Camera started.");
+  }catch(e){
+    scanning=false;
+    log("getUserMedia error:", e.message);
+    alert("Could not access camera. Make sure you're on HTTPS and allowed camera permissions.");
+    return;
+  }
+
+  if ('BarcodeDetector' in window) {
+    usingNative = true;
+    engineNameEl.textContent = "BarcodeDetector";
+    nativeLoop();
+  } else {
+    usingNative = false;
+    engineNameEl.textContent = "ZXing";
+    await startZXing();
+  }
+}
+
+function stopCamera(){
+  scanning=false;
+  if (zxingReader) {
+    try { zxingReader.stopContinuousDecode(); } catch {}
+  }
+  if (videoEl) { videoEl.pause(); videoEl.srcObject = null; }
+  if (stream) {
+    stream.getTracks().forEach(t=>t.stop());
+    stream=null;
+  }
+  log("Camera stopped.");
+}
+
+startBtn.addEventListener("click", startCamera);
+stopBtn.addEventListener("click", stopCamera);
+
+/* Native BarcodeDetector loop */
+async function nativeLoop(){
+  const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','itf','code_39','qr_code']});
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  const tick = async () => {
+    if (!scanning) return;
+    try{
+      const w = videoEl.videoWidth, h = videoEl.videoHeight;
+      if (w && h){
+        canvas.width=w; canvas.height=h;
+        ctx.drawImage(videoEl, 0,0,w,h);
+        const bitmap = canvas;
+        const codes = await detector.detect(bitmap);
+        if (codes && codes.length){
+          for (const c of codes) handleCode(c.rawValue || c.rawValue === 0 ? String(c.rawValue) : String(c));
+        }
+      }
+    }catch(e){ /* swallow intermittent */ }
+    requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+/* ZXing fallback */
+async function startZXing(){
+  try{
+    const mod = await import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm');
+    const {BrowserMultiFormatContinuousReader, DecodeHintType, BarcodeFormat} = mod;
+
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128, BarcodeFormat.ITF
+    ]);
+
+    zxingReader = new BrowserMultiFormatContinuousReader(hints, {delayBetweenScanAttempts: 75, delayBetweenScanSuccess: 350});
+    await zxingReader.decodeFromVideoDevice(cameraSelect.value || null, videoEl, (result, err, controls)=>{
+      if (result) {
+        handleCode(String(result.getText()));
+      }
+      if (err) { /* ignore frequent decode errors */ }
+    });
+    log("ZXing reader running.");
+  } catch(e){
+    engineNameEl.textContent = "ZXing (load failed)";
+    log("Failed to load ZXing:", e.message);
+    alert("BarcodeDetector not supported and ZXing failed to load. You can still add items manually.");
+  }
+}
+
+/* Dedup & Fill form on scan */
+function handleCode(code){
+  const now = Date.now();
+  const last = seenCodes.get(code) || 0;
+  if (now - last < 1200) return; // throttle duplicates
+  seenCodes.set(code, now);
+
+  lastCodeEl.textContent = code;
+  $("#barcodeInput").value = code;
+
+  // If the product is already in list, just highlight & return
+  const idx = products.findIndex(p => p.barcode === code);
+  if (idx >= 0) {
+    products[idx].count = (products[idx].count||1)+1;
+    save(); renderList();
+    return;
+  }
+
+  // Pre-fill a placeholder name; user can edit
+  $("#nameInput").value ||= `Product ${code}`;
+  // Try to guess type unknown
+  $("#typeInput").value = "unknown";
+}
+
+/* ---------- Add / Edit / Remove Products ---------- */
+$("#addBtn").addEventListener("click", ()=>{
+  const barcode = $("#barcodeInput").value.trim();
+  const name = $("#nameInput").value.trim();
+  const type = $("#typeInput").value;
+  const classHint = $("#classInput").value.trim();
+  const ingredients = $("#ingredientsInput").value.trim()
+    ? $("#ingredientsInput").value.split(",").map(s=>s.trim()).filter(Boolean)
+    : [];
+
+  if (!barcode && !name){
+    alert("Enter at least a barcode or a product name.");
+    return;
+  }
+
+  const existingIdx = barcode ? products.findIndex(p => p.barcode===barcode) : -1;
+  const product = {
+    id: barcode || crypto.randomUUID(),
+    barcode: barcode || "",
+    name: name || (barcode ? `Product ${barcode}` : "Unnamed product"),
+    type, classHint, ingredients,
+    count: (existingIdx>=0 ? (products[existingIdx].count||1) : 1)
+  };
+
+  if (existingIdx>=0) products[existingIdx] = {...products[existingIdx], ...product};
+  else products.unshift(product);
+
+  save(); renderList();
+});
+
+$("#clearFormBtn").addEventListener("click", ()=>{
+  $("#barcodeInput").value="";
+  $("#nameInput").value="";
+  $("#typeInput").value="supplement";
+  $("#classInput").value="";
+  $("#ingredientsInput").value="";
+});
+
+function renderList(){
+  productListEl.innerHTML="";
+  if (!products.length){
+    productListEl.innerHTML = `<div class="muted tiny">No products yet. Scan a barcode or add manually.</div>`;
+    return;
+  }
+  for (const p of products){
+    const div = document.createElement("div");
+    div.className = "item";
+    const left = document.createElement("div");
+    left.innerHTML = `
+      <div><strong>${escapeHTML(p.name)}</strong> ${p.type!=="unknown"?`<span class="pill tiny">${p.type}</span>`:""}</div>
+      <div class="tiny mono muted">${p.barcode ? "Barcode: "+escapeHTML(p.barcode) : "No barcode"} • ${p.classHint?`Class: ${escapeHTML(p.classHint)} • `:""}Count: ${p.count||1}</div>
+      ${p.ingredients?.length? `<div class="tiny muted">Ingredients: ${escapeHTML(p.ingredients.join(", "))}</div>` : ""}
+    `;
+    const right = document.createElement("div");
+    right.className="row";
+    const editBtn = document.createElement("button"); editBtn.className="ghost"; editBtn.textContent="Edit";
+    editBtn.onclick = ()=>{
+      $("#barcodeInput").value = p.barcode;
+      $("#nameInput").value = p.name;
+      $("#typeInput").value = p.type;
+      $("#classInput").value = p.classHint || "";
+      $("#ingredientsInput").value = (p.ingredients||[]).join(", ");
+      window.scrollTo({top:0,behavior:"smooth"});
+    };
+    const delBtn = document.createElement("button"); delBtn.className="danger"; delBtn.textContent="Remove";
+    delBtn.onclick = ()=>{
+      if (confirm(`Remove "${p.name}"?`)){
+        products = products.filter(x=>x!==p);
+        save(); renderList();
+      }
+    };
+    right.append(editBtn, delBtn);
+    div.append(left, right);
+    productListEl.append(div);
+  }
+}
+
+/* ---------- Export / Import ---------- */
+$("#copyListBtn").addEventListener("click", async ()=>{
+  const json = JSON.stringify(products, null, 2);
+  await navigator.clipboard.writeText(json);
+  alert("Copied current list to clipboard (JSON). Paste it back later via Import.");
+});
+$("#exportFileBtn").addEventListener("click", ()=>{
+  const blob = new Blob([JSON.stringify(products,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download="supplement-med-list.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+});
+$("#importBtn").addEventListener("click", async ()=>{
+  const txt = prompt("Paste JSON here (from a previous Copy):");
+  if (!txt) return;
+  try{
+    const arr = JSON.parse(txt);
+    if (!Array.isArray(arr)) throw new Error("Not an array");
+    // merge by barcode or id
+    const byKey = new Map(products.map(p=>[(p.barcode||p.id), p]));
+    for (const p of arr){
+      const key = p.barcode||p.id;
+      byKey.set(key, {...byKey.get(key), ...p});
+    }
+    products = Array.from(byKey.values());
+    save(); renderList();
+    alert("Imported.");
+  } catch(e){
+    alert("Import failed: " + e.message);
+  }
+});
+$("#resetBtn").addEventListener("click", ()=>{
+  if (!confirm("Clear saved products?")) return;
+  products = []; save(); renderList();
+});
+
+/* ---------- Analysis (rule-based) ---------- */
+$("#analyzeBtn").addEventListener("click", ()=>{
+  const res = analyze(products);
+  renderAnalysis(res);
+});
+
+function renderAnalysis({interactions, timing}){
+  interactionsEl.innerHTML = "";
+  timingEl.innerHTML = "";
+
+  if (!interactions.length){
+    interactionsEl.innerHTML = `<div class="tiny good">No rule-based conflicts detected with the info provided. This does not guarantee safety—verify with a pharmacist.</div>`;
+  } else {
+    const ul = document.createElement("ul");
+    ul.style.margin="0"; ul.style.paddingLeft="18px";
+    for (const item of interactions){
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="${item.severity==='high'?'bad':(item.severity==='moderate'?'warnText':'')}"><strong>${escapeHTML(item.title)}</strong></span> — ${escapeHTML(item.message)} ${item.action?`<em>Action:</em> ${escapeHTML(item.action)}`:""}`;
+      ul.append(li);
+    }
+    interactionsEl.append(ul);
+  }
+
+  if (!timing.length){
+    timingEl.innerHTML = `<div class="tiny muted">No timing advice matched your entries. Add ingredients and/or med class to get more suggestions.</div>`;
+  } else {
+    const ul2 = document.createElement("ul");
+    ul2.style.margin="0"; ul2.style.paddingLeft="18px";
+    for (const t of timing){
+      const li = document.createElement("li");
+      li.innerHTML = `<strong>${escapeHTML(t.title)}:</strong> ${escapeHTML(t.message)}`;
+      ul2.append(li);
+    }
+    timingEl.append(ul2);
+  }
+}
+
+/* Rules: common, conservative, educational */
+const RULES = (()=>{
+
+  // Canonical names and synonyms
+  const syn = (/* map */) => new Map(Object.entries({
+    // vitamins & minerals
+    "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
+    "vitamin d": ["vit d","cholecalciferol","d3","ergocalciferol","d2"],
+    "vitamin a": ["retinol","retinyl","beta-carotene","beta carotene"],
+    "vitamin e": ["tocopherol","tocotrienol"],
+    "iron": ["ferrous sulfate","ferrous gluconate","ferrous fumarate"],
+    "calcium": ["calcium carbonate","calcium citrate"],
+    "magnesium": ["magnesium citrate","magnesium glycinate","magnesium oxide","magnesium malate","magnesium threonate"],
+    "zinc": ["zinc picolinate","zinc citrate","zinc gluconate"],
+    "fish oil": ["omega 3","epa","dha","omega-3","fish oil concentrate","cod liver oil"],
+    "curcumin": ["turmeric","curcuminoids"],
+    "berberine": ["berberis","goldenseal"],
+    "st johns wort": ["st. john's wort","hypericum"],
+    "5-htp": ["5htp","5 hydroxytryptophan","l-5-htp"],
+    "sam-e": ["same","s-adenosylmethionine","s adenosyl methionine"],
+    "melatonin": [],
+    "coq10": ["ubiquinone","ubiquinol"],
+    "probiotic": ["lactobacillus","bifidobacterium","saccharomyces boulardii","probiotics"],
+    "grapefruit": ["grapefruit extract","grapefruit juice"],
+
+    // med classes
+    "warfarin": ["coumadin","jantoven"],
+    "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine"],
+    "snri": ["venlafaxine","desvenlafaxine","duloxetine","levomilnacipran","milnacipran"],
+    "maoi": ["phenelzine","tranylcypromine","isocarboxazid","selegiline"],
+    "thyroid": ["levothyroxine","lt4","liothyronine","desiccated thyroid","np thyroid","armour thyroid"],
+    "quinolone": ["ciprofloxacin","levofloxacin","moxifloxacin","ofloxacin"],
+    "tetracycline": ["doxycycline","minocycline","tetracycline"],
+    "bisphosphonate": ["alendronate","risedronate","ibandronate","zoledronic acid"],
+    "ppi": ["omeprazole","esomeprazole","lansoprazole","pantoprazole","rabeprazole"],
+    "statin": ["atorvastatin","simvastatin","lovastatin","rosuvastatin","pravastatin","pitavastatin"],
+    "ace/arb": ["lisinopril","enalapril","ramipril","benazepril","losartan","valsartan","olmesartan","candesartan"],
+    "diuretic": ["furosemide","torsemide","bumetanide","hydrochlorothiazide","chlorthalidone"],
+    "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"],
+  }));
+
+  const synonyms = syn();
+
+  function canonize(s){
+    s = s.toLowerCase().trim();
+    for (const [canon, alts] of synonyms){
+      if (s===canon) return canon;
+      if (alts.some(a => a===s)) return canon;
+    }
+    return s;
+  }
+
+  /* Interaction checks return {severity,title,message,action} */
+  const checks = [
+    // Warfarin & Vitamin K
+    ({has})=>{
+      if (has("warfarin") && has("vitamin k")){
+        return {severity:"moderate", title:"Warfarin + Vitamin K",
+          message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
+          action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."};
+      }
+    },
+    // Warfarin + fish oil/curcumin/garlic/ginkgo (bleeding risk)
+    ({hasAny, has})=>{
+      if (has("warfarin") && hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
+        return {severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
+          message:"May increase bleeding tendency.",
+          action:"Monitor for bleeding/bruising; discuss with clinician."};
+      }
+    },
+    // Serotonergic combos: SSRI/SNRI/MAOI + 5-HTP / SAMe / St John's Wort
+    ({hasAny})=>{
+      if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])){
+        return {severity:"high", title:"Serotonergic Combination",
+          message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise risk of serotonin syndrome.",
+          action:"Avoid combining or use only under medical supervision."};
+      }
+    },
+    // St John's Wort enzyme induction
+    ({has})=>{
+      if (has("st johns wort")){
+        return {severity:"moderate", title:"St John’s Wort Interactions",
+          message:"Can reduce levels of many medications (e.g., oral contraceptives, cyclosporine, some anticoagulants) via CYP3A4 induction.",
+          action:"Review all meds with a pharmacist if using St John’s Wort."};
+      }
+    },
+    // Thyroid meds + iron/calcium/magnesium/fiber/coffee
+    ({hasAny, has})=>{
+      if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) {
+        return {severity:"moderate", title:"Thyroid + Minerals",
+          message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
+          action:"Separate by at least 4 hours."};
+      }
+    },
+    // Antibiotics (quinolone/tetracycline) + minerals
+    ({hasAny})=>{
+      if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) {
+        return {severity:"moderate", title:"Antibiotic + Minerals",
+          message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
+          action:"Separate by 2–4 hours (follow specific label guidance)."};
+      }
+    },
+    // Statins + Grapefruit
+    ({has, hasAny})=>{
+      if (has("statin") && has("grapefruit")) {
+        return {severity:"moderate", title:"Statin + Grapefruit",
+          message:"Grapefruit can raise statin levels (notably simvastatin, lovastatin, atorvastatin).",
+          action:"Avoid grapefruit unless your clinician confirms your statin is unaffected."};
+      }
+    },
+    // ACE/ARB + Potassium (from supplements)
+    ({has, hasAny})=>{
+      if (has("ace/arb") && hasAny(["potassium","potassium citrate","potassium chloride"])) {
+        return {severity:"moderate", title:"ACE/ARB + Potassium",
+          message:"May increase potassium levels.",
+          action:"Avoid extra potassium unless prescribed; monitor if directed."};
+      }
+    },
+    // Anticoagulants + fish oil/curcumin (non-warfarin)
+    ({hasAny})=>{
+      if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) {
+        return {severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
+          message:"Potential additive bleeding risk.",
+          action:"Use cautiously; discuss with clinician."};
+      }
+    },
+    // Berberine + antidiabetics (hypoglycemia potential)
+    ({has, hasAny})=>{
+      if (has("berberine") && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
+        return {severity:"low", title:"Berberine + Glucose-Lowering Meds",
+          message:"May enhance glucose-lowering effects.",
+          action:"Monitor glucose and discuss dose adjustments with clinician."};
+      }
+    }
+  ];
+
+  /* Timing suggestions return {title,message} */
+  const timing = [
+    ({has})=> has("iron") && ({title:"Iron", message:"Best on an empty stomach with vitamin C; avoid coffee/tea; separate from calcium/thyroid by 4 hours."}),
+    ({has})=> has("magnesium") && ({title:"Magnesium", message:"Often taken in evening (may relax); separate from quinolone/tetracycline antibiotics by 2–4 hours."}),
+    ({has})=> has("zinc") && ({title:"Zinc", message:"Take with food if it upsets stomach; separate from antibiotics by 2–4 hours."}),
+    ({has})=> has("calcium") && ({title:"Calcium", message:"Carbonate: with meals; Citrate: with or without food. Separate from iron/thyroid by several hours."}),
+    ({hasAny})=> (hasAny(["vitamin a","vitamin d","vitamin e","vitamin k","fish oil"])) && ({title:"Fat-soluble Vitamins & Omega-3", message:"Take with a meal containing fat for absorption."}),
+    ({has})=> has("probiotic") && ({title:"Probiotics", message:"Take with a meal or 30 min before; separate from antibiotics by 2–3 hours."}),
+    ({has})=> has("thyroid") && ({title:"Thyroid hormone", message:"Empty stomach with water; 30–60 min before breakfast; separate minerals/supplements by ≥4 hours."}),
+    ({has})=> has("bisphosphonate") && ({title:"Bisphosphonates", message:"First thing in morning with water only; stay upright 30–60 min; avoid food/supplements during that window."}),
+    ({has})=> has("melatonin") && ({title:"Melatonin", message:"30–60 min before bedtime; avoid driving/operating machinery after."}),
+    ({has})=> has("ppi") && ({title:"PPIs", message:"Often 30–60 min before first meal; verify your specific product directions."})
+  ];
+
+  return {canonize, checks, timing};
+})();
+
+/* Analyzer */
+function analyze(items){
+  // Collect all canonical tokens from ingredients + class + name
+  const bag = new Set();
+  for (const p of items){
+    const fields = [
+      ...(p.ingredients||[]),
+      ...(p.classHint?[p.classHint]:[]),
+      p.name||"",
+      // allow naive detection for some common words in name
+    ];
+    for (const raw of fields){
+      const parts = String(raw).split(/[+,/()\-]| and | with | & /i).map(s=>s.trim()).filter(Boolean);
+      for (const part of parts){
+        bag.add(RULES.canonize(part));
+      }
+    }
+  }
+
+  const has = (canon)=> bag.has(canon);
+  const hasAny = (arr)=> arr.some(x=>has(x));
+
+  const foundInteractions = [];
+  for (const fn of RULES.checks){
+    const r = fn({has,hasAny});
+    if (r) foundInteractions.push(r);
+  }
+
+  const timing = [];
+  for (const tf of RULES.timing){
+    const r = tf({has,hasAny});
+    if (r) timing.push(r);
+  }
+
+  // De-duplicate by title
+  const uniq = (arr, key) => Array.from(new Map(arr.map(o=>[o[key], o])).values());
+  return {interactions: uniq(foundInteractions, "title"), timing: uniq(timing,"title")};
+}
+
+/* ---------- Storage ---------- */
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(products)); }catch{} }
+function load(){
+  try{ const s=localStorage.getItem(LS_KEY); return s? JSON.parse(s):[]; }catch{ return []; }
+}
+
+/* ---------- Camera init & device list ---------- */
+(async function init(){
+  engineNameEl.textContent = ('BarcodeDetector' in window) ? "BarcodeDetector" : "ZXing";
+  await listCameras();
+
+  // If we can’t read device labels yet, request a temp stream then re-list
+  const needLabels = !Array.from(cameraSelect.options).some(o=>o.textContent && o.textContent!=="Camera 1");
+  if (needLabels && navigator.mediaDevices?.getUserMedia) {
+    try {
+      const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+      temp.getTracks().forEach(t=>t.stop());
+      await listCameras();
+    } catch(e) { /* ignore */ }
+  }
+})();
+
+/* ---------- Helpers ---------- */
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"'"}[m])); }
+</script>
+
+<footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
+  <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety.</div>
+  <div style="margin-top:6px">For best results, host over HTTPS (e.g., GitHub Pages). v1.0</div>
+</footer>
+</body>
+</html>
