@@ -25,10 +25,10 @@
   textarea{min-height:64px;resize:vertical}
   button{cursor:pointer;background:linear-gradient(180deg,#0ea5e9,#0284c7);border:0;font-weight:600}
   button.ghost{background:transparent;border:1px solid #254065}
-  button.warn{background:linear-gradient(180deg,#f59e0b,#d97706)}
   button.danger{background:linear-gradient(180deg,#ef4444,#dc2626)}
   button.ok{background:linear-gradient(180deg,#22c55e,#16a34a)}
-  .muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
+  .muted{color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
   .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid #254065;background:#0c1424}
   .list{display:flex;flex-direction:column;gap:10px}
   .item{display:flex;gap:10px;justify-content:space-between;align-items:center;border:1px solid #1f2a44;background:#0b1420;padding:10px;border-radius:10px}
@@ -62,7 +62,7 @@
               <button id="startBtn">Start Camera</button>
               <button class="ghost" id="stopBtn">Stop</button>
               <button class="ghost" id="forceZXingBtn" title="Force ZXing fallback">Force ZXing</button>
-              <span id="engineTag" class="pill"><span>Engine:&nbsp;</span><strong id="engineName" class="mono">…</strong></span>
+              <span class="pill"><span>Engine:&nbsp;</span><strong id="engineName" class="mono">…</strong></span>
             </div>
           </div>
 
@@ -102,13 +102,13 @@
             </div>
             <div class="col" style="flex:1;min-width:200px">
               <label>Class (optional, meds)</label>
-              <input id="classInput" placeholder="e.g., SSRI, statin, PPI, thyroid, ace inhibitor…" />
+              <input id="classInput" placeholder="e.g., SSRI, statin, PPI, thyroid, ACE inhibitor…" />
             </div>
           </div>
 
           <div class="col" style="margin-top:8px">
             <label>Ingredients (comma-separated)</label>
-            <textarea id="ingredientsInput" placeholder="e.g., magnesium glycinate, magnesium, vitamin D3, fish oil, curcumin"></textarea>
+            <textarea id="ingredientsInput" placeholder="e.g., magnesium glycinate, vitamin D3, fish oil, curcumin"></textarea>
           </div>
 
           <div class="row" style="margin-top:10px">
@@ -184,18 +184,13 @@ const log = (...a)=>{ const el=$("#diag"); if(!el) return; const line=document.c
 function uuid(){ try{ return crypto.randomUUID(); }catch{ return "id-"+Math.random().toString(36).slice(2); } }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 function capitalize(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
-
-/* Normalizers to catch punctuation/spacing variants (e.g., "st. john's wort") */
-function normSpaces(s){
+function normalizePhrase(s){
   return String(s||"")
     .toLowerCase()
-    .replace(/&/g," and ")
-    .replace(/[._'’\-/,()]/g," ")
-    .replace(/\s+/g," ")
+    .replace(/['’]/g, "")          // drop apostrophes
+    .replace(/[._/()\-]+/g, " ")   // unify dot/slash/paren/hyphen as space
+    .replace(/\s+/g, " ")          // collapse spaces
     .trim();
-}
-function normFlat(s){
-  return normSpaces(s).replace(/\s+/g,""); // remove spaces entirely for substring checks
 }
 
 /* ---------------- Elements ---------------- */
@@ -209,7 +204,7 @@ const videoEl = $("#preview");
 const cameraSelect = $("#cameraSelect");
 
 /* ---------------- State ---------------- */
-const LS_KEY = "scannedProducts_v3_textplan_compat";
+const LS_KEY = "scannedProducts_v4_textplan_norm";
 let products = load();
 let stream = null;
 let scanning = false;
@@ -459,7 +454,7 @@ function renderList(){
     const p = products[i];
     const div = document.createElement("div"); div.className="item";
     const left = document.createElement("div");
-    const ing = (p.ingredients && p.ingredients.length) ? `<div class="tiny muted">Ingredients: ${esc(p.ingredients.join(", "))}</div>` : "";
+    const ing = (p.ingredients && p.ingredients.length) ? (`<div class="tiny muted">Ingredients: ${esc(p.ingredients.join(", "))}</div>`) : "";
     left.innerHTML = `
       <div><strong>${esc(p.name)}</strong> ${p.type!=="unknown"?`<span class="pill tiny">${esc(p.type)}</span>`:""}</div>
       <div class="tiny mono muted">${p.barcode ? "Barcode: "+esc(p.barcode) : "No barcode"} • ${p.classHint?`Class: ${esc(p.classHint)} • `:""}Count: ${p.count||1}</div>
@@ -508,7 +503,7 @@ function buildTextPlan(items){
     }
   }
   lines.push("");
-  lines.push("Per-Product Dosage & Timing (general adult guidance; meds: timing only):");
+  lines.push("Per-Product Dosage & Timing (general adult guidance; Rx meds show 'As prescribed'):");
   if (!perProd.length){ lines.push("  (add ingredients/class for matches)"); }
   else{
     for (let i=0;i<perProd.length;i++){
@@ -551,11 +546,8 @@ function parseTextPlan(txt){
 
 /* ---------------- Knowledge base ---------------- */
 const KNOW = (function(){
-
-  // Expanded synonyms (multi-word + class labels)
   const synonyms = new Map(Object.entries({
-    "st johns wort": ["st. john's wort","st john's wort","st johns-wort","hypericum","hypericum perforatum","saint johns wort","saint john's wort"],
-
+    // Supplements / nutrients
     "vitamin k": ["vit k","vitamin k1","phylloquinone","menaquinone","mk-7","mk7","mk-4","mk4"],
     "vitamin d": ["vit d","cholecalciferol","d3","ergocalciferol","d2"],
     "vitamin a": ["retinol","retinyl","beta-carotene","beta carotene"],
@@ -567,146 +559,173 @@ const KNOW = (function(){
     "fish oil": ["omega 3","epa","dha","omega-3","fish oil concentrate","cod liver oil","omega 3 fish oil"],
     "curcumin": ["turmeric","curcuminoids"],
     "berberine": ["berberis","goldenseal"],
+    "st johns wort": ["st. john's wort","st john's wort","st-johns-wort","hypericum"],
+    "5-htp": ["5htp","5 hydroxytryptophan","l-5-htp"],
+    "sam-e": ["same","s-adenosylmethionine","s adenosyl methionine"],
     "melatonin": [],
     "coq10": ["ubiquinone","ubiquinol","co-enzyme q10","coenzyme q10"],
     "probiotic": ["lactobacillus","bifidobacterium","saccharomyces boulardii","probiotics"],
     "grapefruit": ["grapefruit extract","grapefruit juice"],
+    "starch": [],
 
-    "cyclophosphamide": ["cytoxan","endoxan","procytox"],
-
-    // Med classes (expanded)
+    // Drugs / classes
+    "cyclophosphamide": ["cytoxan","endoxan"],
+    "warfarin": ["coumadin","jantoven"],
+    "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine","ssri"],
+    "snri": ["venlafaxine","desvenlafaxine","duloxetine","levomilnacipran","milnacipran","snri"],
+    "maoi": ["phenelzine","tranylcypromine","isocarboxazid","selegiline","maoi"],
+    "thyroid": ["levothyroxine","lt4","liothyronine","desiccated thyroid","np thyroid","armour thyroid","thyroid hormone"],
+    "quinolone": ["ciprofloxacin","levofloxacin","moxifloxacin","ofloxacin","quinolone"],
+    "tetracycline": ["doxycycline","minocycline","tetracycline","tetracyclines"],
+    "bisphosphonate": ["alendronate","risedronate","ibandronate","zoledronic acid","bisphosphonates"],
+    "ppi": ["omeprazole","esomeprazole","lansoprazole","pantoprazole","rabeprazole","proton pump inhibitor","ppi"],
+    "statin": ["atorvastatin","simvastatin","lovastatin","rosuvastatin","pravastatin","pitavastatin","statins"],
     "ace/arb": [
-      "lisinopril","enalapril","ramipril","benazepril","losartan","valsartan","olmesartan","candesartan",
-      "ace inhibitor","ace-inhibitor","acei","angiotensin converting enzyme inhibitor","angiotensin-converting enzyme inhibitor",
-      "arb","angiotensin receptor blocker"
+      "lisinopril","enalapril","ramipril","benazepril","perindopril","quinapril","captopril",
+      "losartan","valsartan","olmesartan","candesartan","irbesartan","telmisartan",
+      "ace inhibitor","angiotensin converting enzyme inhibitor","arb","angiotensin receptor blocker","angiotensin ii receptor blocker"
     ],
-    "ssri": ["sertraline","fluoxetine","paroxetine","citalopram","escitalopram","fluvoxamine","selective serotonin reuptake inhibitor"],
-    "snri": ["venlafaxine","desvenlafaxine","duloxetine","levomilnacipran","milnacipran"],
-    "maoi": ["phenelzine","tranylcypromine","isocarboxazid","selegiline","monoamine oxidase inhibitor"],
-    "thyroid": ["levothyroxine","lt4","liothyronine","desiccated thyroid","np thyroid","armour thyroid"],
-    "quinolone": ["ciprofloxacin","levofloxacin","moxifloxacin","ofloxacin","fluoroquinolone"],
-    "tetracycline": ["doxycycline","minocycline","tetracycline"],
-    "bisphosphonate": ["alendronate","risedronate","ibandronate","zoledronic acid"],
-    "ppi": ["omeprazole","esomeprazole","lansoprazole","pantoprazole","rabeprazole","proton pump inhibitor"],
-    "statin": ["atorvastatin","simvastatin","lovastatin","rosuvastatin","pravastatin","pitavastatin"],
     "anticoagulant": ["apixaban","rivaroxaban","dabigatran","edoxaban","heparin","enoxaparin","warfarin"]
   }));
 
-  function canonize(raw){
-    let s = normSpaces(raw); // lowercased, punctuation-normalized
-    // direct canonical match
-    if (synonyms.has(s)) return s;
-    // check if s equals any synonym; if so, return its canonical key
-    const it = synonyms.entries();
-    for (let kv = it.next(); !kv.done; kv = it.next()){
-      const canon = kv.value[0], alts = kv.value[1];
+  function canonize(s){
+    s = String(s||"").toLowerCase().trim();
+    for (const [canon, alts] of synonyms){
       if (s===canon) return canon;
-      for (let j=0;j<alts.length;j++){ if (s===normSpaces(alts[j])) return canon; }
+      for (let i=0;i<alts.length;i++){ if (alts[i]===s) return canon; }
     }
     return s;
   }
 
   const checks = [
-    // Specific: St John's Wort + Cyclophosphamide
-    function({has}){ if (has("st johns wort") && has("cyclophosphamide")) return {
-      severity:"moderate",
-      title:"St John’s Wort + Cyclophosphamide",
-      message:"St John’s Wort induces drug-metabolizing enzymes/transporters and may alter cyclophosphamide exposure/effectiveness.",
-      action:"Avoid combining unless your oncology team approves; review all supplements with them."
-    }; },
+    // Specific: Cyclophosphamide + St John's Wort
+    ({has})=>{
+      if (has("cyclophosphamide") && has("st johns wort")){
+        return {
+          severity:"moderate",
+          title:"Cyclophosphamide + St John’s Wort",
+          message:"St John’s Wort induces drug-metabolizing enzymes (e.g., CYP3A family), which may reduce cyclophosphamide exposure or alter its effects.",
+          action:"Avoid St John’s Wort during chemotherapy; confirm with your oncology pharmacist."
+        };
+      }
+    },
 
-    // General enzyme induction by SJW
-    function({has}){ if (has("st johns wort")) return {
-      severity:"moderate",
-      title:"St John’s Wort – Enzyme/Transporter Induction",
-      message:"Can change levels of many medicines (e.g., oral contraceptives, some anticoagulants/antidepressants/chemotherapy) via CYP3A4/P-gp induction.",
-      action:"Review all meds with a pharmacist/clinician before using St John’s Wort."
-    }; },
+    // Broad enzyme induction warning for SJW
+    ({has})=>{
+      if (has("st johns wort")){
+        return {severity:"moderate", title:"St John’s Wort – Enzyme Induction",
+          message:"Can lower levels of many medications via enzyme induction (not comprehensive).",
+          action:"Review all meds with a pharmacist if using St John’s Wort."};
+      }
+    },
 
     // Warfarin + Vitamin K
-    function({has}){ if (has("warfarin") && has("vitamin k")) return {
-      severity:"moderate", title:"Warfarin + Vitamin K",
-      message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
-      action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."
-    }; },
+    ({has})=>{
+      if (has("warfarin") && has("vitamin k")){
+        return {severity:"moderate", title:"Warfarin + Vitamin K",
+          message:"Vitamin K can reduce the anticoagulant effect of warfarin.",
+          action:"Keep vitamin K intake consistent; consult your anticoagulation clinic before changes."};
+      }
+    },
 
     // Warfarin + bleeding-risk supplements
-    function({hasAny}){ if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) return {
-      severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
-      message:"May increase bleeding tendency.",
-      action:"Monitor for bleeding/bruising; discuss with clinician."
-    }; },
+    ({hasAny})=>{
+      if (hasAny(["warfarin"]) && hasAny(["fish oil","curcumin","ginkgo","garlic"])) {
+        return {severity:"moderate", title:"Warfarin + Omega-3/Turmeric/Ginkgo/Garlic",
+          message:"Potential additive bleeding tendency.",
+          action:"Monitor for bleeding/bruising; discuss with clinician."};
+      }
+    },
 
-    // Serotonergic combos
-    function({hasAny}){ if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])) return {
-      severity:"high", title:"Serotonergic Combination",
-      message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise serotonin-syndrome risk.",
-      action:"Avoid combining or use only under medical supervision."
-    }; },
+    // Serotonergic combinations
+    ({hasAny})=>{
+      if (hasAny(["ssri","snri","maoi"]) && hasAny(["5-htp","sam-e","st johns wort"])){
+        return {severity:"high", title:"Serotonergic Combination",
+          message:"Combining antidepressants with 5-HTP, SAM-e, or St John’s Wort may raise serotonin syndrome risk.",
+          action:"Avoid combining or use only under medical supervision."};
+      }
+    },
 
     // Thyroid + minerals
-    function({has,hasAny}){ if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) return {
-      severity:"moderate", title:"Thyroid + Minerals",
-      message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
-      action:"Separate by at least 4 hours."
-    }; },
+    ({hasAny, has})=>{
+      if (has("thyroid") && hasAny(["iron","calcium","magnesium"])) {
+        return {severity:"moderate", title:"Thyroid + Minerals",
+          message:"Iron, calcium, and magnesium can reduce thyroid hormone absorption.",
+          action:"Separate by at least 4 hours."};
+      }
+    },
 
-    // Antibiotics + minerals
-    function({hasAny}){ if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) return {
-      severity:"moderate", title:"Antibiotic + Minerals",
-      message:"Minerals can chelate with quinolones/tetracyclines and reduce antibiotic absorption.",
-      action:"Separate by 2–4 hours (follow label)."
-    }; },
+    // Antibiotics (chelation) + minerals
+    ({hasAny})=>{
+      if (hasAny(["quinolone","tetracycline"]) && hasAny(["magnesium","calcium","iron","zinc"])) {
+        return {severity:"moderate", title:"Antibiotic + Minerals",
+          message:"Minerals can chelate with quinolones/tetracyclines and reduce absorption.",
+          action:"Separate by 2–4 hours (follow label)."};
+      }
+    },
 
-    // Statins + grapefruit
-    function({has}){ if (has("statin") && has("grapefruit")) return {
-      severity:"moderate", title:"Statin + Grapefruit",
-      message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
-      action:"Avoid grapefruit unless your statin is known to be unaffected."
-    }; },
+    // Statin + grapefruit
+    ({has})=>{
+      if (has("statin") && has("grapefruit")) {
+        return {severity:"moderate", title:"Statin + Grapefruit",
+          message:"Grapefruit can raise levels of some statins (simvastatin, lovastatin, atorvastatin).",
+          action:"Avoid grapefruit unless your statin is known to be unaffected."};
+      }
+    },
 
-    // ACE/ARB + potassium (now recognizes “ace inhibitor” class text)
-    function({hasAny}){ if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) return {
-      severity:"moderate", title:"ACE/ARB + Potassium",
-      message:"May increase potassium levels.",
-      action:"Avoid extra potassium unless prescribed; monitor if directed."
-    }; },
+    // ACE/ARB + potassium
+    ({hasAny})=>{
+      if (hasAny(["ace/arb"]) && hasAny(["potassium","potassium citrate","potassium chloride"])) {
+        return {severity:"moderate", title:"ACE/ARB + Potassium",
+          message:"May increase potassium levels.",
+          action:"Avoid extra potassium unless prescribed; monitor if directed."};
+      }
+    },
 
-    // Anticoagulants + fish oil/curcumin
-    function({hasAny}){ if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) return {
-      severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
-      message:"Potential additive bleeding risk.",
-      action:"Use cautiously; discuss with clinician."
-    }; },
+    // Anticoagulant + bleeding-risk supplements (non-warfarin)
+    ({hasAny})=>{
+      if (hasAny(["anticoagulant"]) && hasAny(["fish oil","curcumin"])) {
+        return {severity:"moderate", title:"Anticoagulant + Omega-3/Turmeric",
+          message:"Potential additive bleeding risk.",
+          action:"Use cautiously; discuss with clinician."};
+      }
+    },
 
     // Berberine + glucose-lowering meds
-    function({hasAny}){ if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) return {
-      severity:"low", title:"Berberine + Glucose-Lowering Meds",
-      message:"May enhance glucose-lowering effects.",
-      action:"Monitor glucose and discuss adjustments with clinician."
-    }; }
-  ];
+    ({hasAny})=>{
+      if (hasAny(["berberine"]) && hasAny(["metformin","insulin","sulfonylurea","glp-1","sglt2"])) {
+        return {severity:"low", title:"Berberine + Glucose-Lowering Meds",
+          message:"May enhance glucose-lowering effects.",
+          action:"Monitor glucose and discuss adjustments with clinician."};
+      }
+    }
+  ]);
 
+  // Per-product dosage & timing (supplements show typical adult ranges; Rx meds = “As prescribed”)
   const perProduct = [
+    {key:"st johns wort", dosage:"300 mg standardized extract (0.3% hypericin) 3×/day or 600–900 mg 1×/day", times:"1–3×/day", timing:"Any time; strong drug-interaction potential—avoid with many meds.", withFood:"With or without food."},
     {key:"magnesium", dosage:"200–400 mg elemental/day", times:"1–2×/day", timing:"Evening may help relaxation; separate from certain antibiotics by 2–4 h; may reduce thyroid absorption (separate ≥4 h).", withFood:"With or without food (glycinate/citrate gentler)."},
     {key:"zinc", dosage:"10–25 mg/day", times:"1×/day", timing:"Separate from antibiotics by 2–4 h.", withFood:"Take with food if nausea."},
     {key:"calcium", dosage:"500–1000 mg/day (split)", times:"1–2×/day", timing:"Carbonate with meals; Citrate any time; separate from iron/thyroid ≥4 h.", withFood:"Prefer with meals (esp. carbonate)."},
-    {key:"iron", dosage:"As labeled (e.g., 18–65 mg elemental)", times:"1×/day", timing:"Best on empty stomach with vitamin C; separate from calcium/thyroid ≥4 h; avoid coffee/tea near dose.", withFood:"With small snack if GI upset."},
+    {key:"iron", dosage:"18–65 mg elemental/day (per label)", times:"1×/day", timing:"Best on empty stomach with vitamin C; separate from calcium/thyroid ≥4 h; avoid coffee/tea near dose.", withFood:"Small snack if GI upset."},
     {key:"vitamin d", dosage:"1000–4000 IU/day", times:"1×/day", timing:"Any time.", withFood:"With a meal containing fat."},
-    {key:"vitamin k", dosage:"As labeled", times:"1×/day", timing:"Consistency matters if on warfarin.", withFood:"With meals (fat helps)."},
-    {key:"vitamin a", dosage:"As labeled", times:"1×/day", timing:"Any time.", withFood:"With fat."},
+    {key:"vitamin k", dosage:"Per label (varies by MK-4/MK-7)", times:"1×/day", timing:"Consistency matters if on warfarin.", withFood:"With meals (fat helps)."},
+    {key:"vitamin a", dosage:"Per label (avoid excess >10,000 IU/day unless directed)", times:"1×/day", timing:"Any time.", withFood:"With fat."},
     {key:"vitamin e", dosage:"100–200 IU/day", times:"1×/day", timing:"Any time.", withFood:"With fat."},
-    {key:"fish oil", dosage:"1–3 g/day EPA+DHA combined", times:"1–2×/day", timing:"Any time.", withFood:"With meals (fat helps, reduces burps)."},
+    {key:"fish oil", dosage:"1–3 g/day EPA+DHA combined", times:"1–2×/day", timing:"Any time.", withFood:"With meals (fat helps; reduces burps)."},
     {key:"coq10", dosage:"100–200 mg/day", times:"1×/day", timing:"Any time.", withFood:"With fat-containing meal."},
     {key:"curcumin", dosage:"500–1000 mg/day (std. extract)", times:"1–2×/day", timing:"Any time.", withFood:"With meals; piperine enhances absorption."},
-    {key:"probiotic", dosage:"As labeled (e.g., 10–20B CFU)", times:"1×/day", timing:"With a meal or 30 min before; separate from antibiotics by 2–3 h.", withFood:"With meal is fine."},
+    {key:"probiotic", dosage:"Per label (e.g., 10–20B CFU)", times:"1×/day", timing:"With a meal or 30 min before; separate from antibiotics by 2–3 h.", withFood:"With meal is fine."},
     {key:"melatonin", dosage:"0.5–5 mg", times:"1×/night", timing:"30–60 min before bed; avoid driving thereafter.", withFood:"With or without food."},
-    {key:"berberine", dosage:"500–1500 mg/day", times:"1–3×/day", timing:"Before meals may aid glycemia; monitor if on glucose-lowering meds.", withFood:"With meals if GI upset."},
+
+    // Safe, non-specific entries for Rx classes/agents
+    {key:"ace/arb", dosage:"As prescribed", times:"1×/day", timing:"Any time; monitor BP; avoid high-potassium supplements unless directed.", withFood:"With or without food."},
     {key:"thyroid", dosage:"As prescribed", times:"1×/day", timing:"Empty stomach with water; 30–60 min before breakfast; separate minerals/supps ≥4 h.", withFood:"Empty stomach required."},
     {key:"ppi", dosage:"As prescribed", times:"1×/day", timing:"30–60 min before first meal.", withFood:"Before meal."},
     {key:"statin", dosage:"As prescribed", times:"1×/day", timing:"Evening preferred for simvastatin/lovastatin; others any time; avoid grapefruit with certain statins.", withFood:"With or without food."},
-    {key:"bisphosphonate", dosage:"As prescribed", times:"Per product", timing:"Morning, water only; upright 30–60 min; avoid food/supps during window.", withFood:"No—empty stomach rules."}
-  ];
+    {key:"bisphosphonate", dosage:"As prescribed", times:"Per product", timing:"Morning, water only; upright 30–60 min; avoid food/supps during window.", withFood:"No—empty stomach rules."},
+    {key:"cyclophosphamide", dosage:"As prescribed", times:"Per regimen", timing:"Follow oncology instructions exactly; avoid St John’s Wort.", withFood:"Per oncology guidance."}
+  ]);
 
   function perProductAdvice(has){
     const out=[]; for (let i=0;i<perProduct.length;i++){ const rec=perProduct[i]; if (has(rec.key)) out.push(rec); } return out;
@@ -715,54 +734,53 @@ const KNOW = (function(){
   return { canonize, checks, perProductAdvice };
 })();
 
-/* --------- Analyzer (improved multi-word & class detection) --------- */
+/* ---------------- Analyzer ---------------- */
 function analyze(items){
-  const bag = new Set();       // canonical tokens/phrases (space-normalized)
-  const bagFlat = new Set();   // flattened (no spaces) for substring matches
-
-  function addToBag(s){
-    if (!s) return;
-    const canon = KNOW.canonize(s);
-    bag.add(canon);
-    bagFlat.add(normFlat(s));
-    bagFlat.add(normFlat(canon));
-    // also split into parts for single-word hits
-    const parts = normSpaces(s).split(/\s+/).filter(Boolean);
-    for (let i=0;i<parts.length;i++){
-      const p = parts[i];
-      bag.add(KNOW.canonize(p));
-      bagFlat.add(normFlat(p));
-    }
-  }
+  const bag = new Set();
 
   for (let i=0;i<items.length;i++){
     const p = items[i];
-    addToBag(p.name||"");
-    addToBag(p.classHint||"");
-    const ings = p.ingredients||[];
-    for (let j=0;j<ings.length;j++){ addToBag(ings[j]); }
+    const fields = [].concat(p.ingredients||[], p.classHint? [p.classHint]:[], p.name||"");
+
+    for (let k=0;k<fields.length;k++){
+      const norm = normalizePhrase(fields[k]);
+      if (!norm) continue;
+
+      // Full phrase (captures multi-word entities like "st johns wort")
+      bag.add(KNOW.canonize(norm));
+
+      // Single tokens
+      const parts = norm.split(/\s+/).filter(Boolean);
+      for (let j=0;j<parts.length;j++){
+        if (parts[j].length>1) bag.add(KNOW.canonize(parts[j]));
+      }
+
+      // Bigrams & trigrams
+      for (let n=2;n<=3;n++){
+        for (let a=0;a<=parts.length-n;a++){
+          const gram = parts.slice(a,a+n).join(" ");
+          bag.add(KNOW.canonize(gram));
+        }
+      }
+    }
   }
 
-  function has(q){
-    const qc = KNOW.canonize(q);
-    if (bag.has(qc)) return true;
-
-    // substring match on flattened forms (handles punctuation/space variants)
-    const qf = normFlat(qc);
-    const it = bagFlat.values();
+  function has(canon){
+    if (bag.has(canon)) return true;
+    const it = bag.values();
     for (let v = it.next(); !v.done; v = it.next()){
-      if (v.value.indexOf(qf) > -1) return true;
+      if (String(v.value).indexOf(canon) > -1) return true;
     }
     return false;
   }
   function hasAny(arr){ for (let i=0;i<arr.length;i++){ if (has(arr[i])) return true; } return false; }
 
   const foundInteractions = [];
-  const checks = KNOW.checks;
-  for (let i=0;i<checks.length;i++){
-    const r = checks[i]({has:has, hasAny:hasAny});
+  for (let i=0;i<KNOW.checks.length;i++){
+    const r = KNOW.checks[i]({has:has, hasAny:hasAny});
     if (r) foundInteractions.push(r);
   }
+
   const uniq = function(arr, key){ return Array.from(new Map(arr.map(function(o){ return [o[key], o]; })).values()); };
   const perProd = KNOW.perProductAdvice(has);
 
@@ -793,4 +811,88 @@ function renderAnalysis(){
   if (!perProd.length){
     timingUIEl.innerHTML = `<div class="tiny muted">Add ingredients and/or med class for more specific guidance.</div>`;
   } else {
-    const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="
+    const ul2 = document.createElement("ul"); ul2.style.margin="0"; ul2.style.paddingLeft="18px";
+    for (let i=0;i<perProd.length;i++){
+      const r = perProd[i];
+      const li = document.createElement("li");
+      li.innerHTML = `<strong>${esc(capitalize(r.key))}</strong> — <em>${esc(r.dosage)}</em>; ${esc(r.times)}; ${esc(r.timing)} ${r.withFood?`• With food: ${esc(r.withFood)}`:""}`;
+      ul2.appendChild(li);
+    }
+    timingUIEl.appendChild(ul2);
+  }
+
+  updateTextPreview();
+}
+
+/* ---------------- Event Listeners ---------------- */
+document.getElementById("startBtn").addEventListener("click", startCamera);
+document.getElementById("stopBtn").addEventListener("click", stopCamera);
+document.getElementById("forceZXingBtn").addEventListener("click", function(){
+  forceZXing=true;
+  if (scanning) startCamera();
+});
+
+document.getElementById("addBtn").addEventListener("click", addOrUpdate);
+document.getElementById("clearFormBtn").addEventListener("click", clearForm);
+
+document.getElementById("analyzeBtn").addEventListener("click", renderAnalysis);
+
+document.getElementById("copyTextBtn").addEventListener("click", async function(){
+  await navigator.clipboard.writeText(buildTextPlan(products));
+  alert("Copied the plain-text plan to clipboard.");
+});
+document.getElementById("downloadTextBtn").addEventListener("click", function(){
+  const blob = new Blob([buildTextPlan(products)], {type:"text/plain"});
+  const url = URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="supplement-med-plan.txt"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+});
+document.getElementById("importBtn").addEventListener("click", function(){
+  const txt = prompt("Paste a plain-text plan created by this app. (Existing entries will be merged.)");
+  if (!txt) return;
+  try{
+    const parsed = parseTextPlan(txt);
+    const key = function(p){ return (p.barcode && p.barcode.trim()) || p.name.toLowerCase(); };
+    const map = new Map(products.map(function(p){ return [key(p),p]; }));
+    for (let i=0;i<parsed.length;i++){
+      const p = parsed[i]; const k = key(p);
+      map.set(k, Object.assign({}, map.get(k)||{}, p));
+    }
+    products = Array.from(map.values());
+    save(); renderList(); updateTextPreview();
+    alert("Imported.");
+  }catch(e){ alert("Import failed: " + (e && e.message ? e.message : String(e))); }
+});
+document.getElementById("resetBtn").addEventListener("click", function(){
+  if (!confirm("Clear saved products?")) return;
+  products = []; save(); renderList(); updateTextPreview();
+});
+
+/* ---------------- Init ---------------- */
+(async function init(){
+  selfTest();
+  engineNameEl.textContent = ('BarcodeDetector' in window && !forceZXing) ? "BarcodeDetector" : "ZXing";
+  renderList(); updateTextPreview();
+  try{
+    await listCameras();
+    // If labels hidden until permission is granted, briefly request then release
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      const needLabels = !Array.from(cameraSelect.options).some(function(o){return o.textContent && o.textContent!=="Camera 1";});
+      if (needLabels){
+        try{
+          const temp = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+          temp.getTracks().forEach(function(t){t.stop();});
+          await listCameras();
+        }catch(e){}
+      }
+    }
+  }catch(e){ log("Init error:", e && e.message ? e.message : String(e)); }
+})();
+</script>
+
+<footer style="padding:24px;text-align:center;color:#8aa3bd" class="tiny">
+  <div>Educational tool – not medical advice. Always check with your pharmacist or clinician for medication safety and dosing.</div>
+  <div style="margin-top:6px">Best on HTTPS (e.g., GitHub Pages). v2.5 (phrase matching + SJW/cyclophosphamide + dosage)</div>
+</footer>
+</body>
+</html>
